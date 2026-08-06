@@ -57,8 +57,8 @@ Earth-Engine was developed as part of the **GreenRes Hackathon**, with the goal 
 
 ## 👥 Team
 
-Joshua Sokpey
-Ellis Acquaye
+- Joshua Sokpey
+- Ellis Acquaye
 
 ## 📄 License
 
