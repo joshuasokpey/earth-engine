@@ -1,9 +1,3 @@
-# 🌍 Earth-Engine
-
-A living ecosystem simulation project created for the **GreenRes Hackathon**.
-
-Earth-Engine is an interactive simulation that explores how environments evolve through the interaction between nature, resources, and human activities.
-
 ## 🚀 Live Demo
 
 Try the MVP here:
@@ -11,6 +5,13 @@ Try the MVP here:
 🔗 https://earth-engine-mvp.netlify.app
 
 > **Note:** For the best experience, use a PC/laptop. The simulation is optimized for larger screens.
+
+
+# 🌍 Earth-Engine
+
+A living ecosystem simulation project created for the **GreenRes Hackathon**.
+
+Earth-Engine is an interactive simulation that explores how environments evolve through the interaction between nature, resources, and human activities.
 
 ## 🎮 How to Use
 
