@@ -43,7 +43,8 @@ Earth-Engine was developed as part of the **GreenRes Hackathon**, with the goal 
 
 ## 👥 Team
 
-(Add your team members here)
+Joshua Sokpey
+Ellis Acquaye
 
 ## 📄 License
 
