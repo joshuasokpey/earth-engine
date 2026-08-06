@@ -1,0 +1,1995 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Ama's village — Earth Engine</title>
+<style>
+  html,body{margin:0;height:100%;background:#0e120c;overflow:hidden;
+    font-family:"Helvetica Neue",Helvetica,Arial,sans-serif;color:#f2ece0;}
+  canvas{display:block;width:100%;height:100%;}
+  #panel{position:absolute;top:16px;left:16px;width:290px;padding:16px 16px 14px;
+    background:rgba(18,22,16,.86);border:1px solid #45503a;border-radius:14px;
+    backdrop-filter:blur(9px);-webkit-backdrop-filter:blur(9px);font-size:13px;
+    box-shadow:0 14px 44px rgba(0,0,0,.55);}
+  #panel h1{margin:0;font-size:14px;font-weight:700;letter-spacing:.02em;}
+  .sub{color:#9aa88a;font-size:11px;letter-spacing:.14em;text-transform:uppercase;margin-top:5px;}
+  .counts{display:flex;flex-wrap:wrap;gap:4px 14px;margin:12px 0 4px;color:#9aa88a;font-size:11.5px;}
+  .counts b{color:#f2ece0;font-weight:600;font-variant-numeric:tabular-nums;}
+  .rule{height:1px;background:#45503a;margin:12px 0;}
+  .seasonhead{display:flex;justify-content:space-between;align-items:baseline;}
+  .seasonhead span:first-child{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#9aa88a;}
+  #seasonlabel{color:#e8b13a;font-weight:700;font-size:12.5px;font-variant-numeric:tabular-nums;}
+  input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:22px;background:transparent;margin:8px 0 2px;cursor:pointer;}
+  input[type=range]::-webkit-slider-runnable-track{height:4px;border-radius:2px;
+    background:linear-gradient(90deg,#2e7d3a,#7fae4e 40%,#c2a95e 72%,#a8853f);}
+  #sun::-webkit-slider-runnable-track{background:linear-gradient(90deg,#39414a,#8b8471 45%,#e8b13a 78%,#fff3cf);}
+  #sun::-moz-range-track{background:linear-gradient(90deg,#39414a,#8b8471 45%,#e8b13a 78%,#fff3cf);}
+  #sunlabel,#rainlabel{color:#e8b13a;font-weight:700;font-size:12.5px;}
+  #rain::-webkit-slider-runnable-track{background:linear-gradient(90deg,#4a5560,#6f8698 45%,#9fc0d6 100%);}
+  #rain::-moz-range-track{background:linear-gradient(90deg,#4a5560,#6f8698 45%,#9fc0d6 100%);}
+  #rainbtn{width:100%;padding:9px 10px;border-radius:9px;cursor:pointer;font:inherit;font-size:12.5px;
+    font-weight:600;letter-spacing:.03em;background:rgba(255,255,255,.05);color:#cbd2bc;
+    border:1px solid #45503a;transition:background .18s,color .18s,border-color .18s;}
+  #rainbtn:hover{background:rgba(255,255,255,.09);}
+  #rainbtn:focus-visible{outline:2px solid #e8b13a;outline-offset:2px;}
+  #rainbtn[aria-pressed="true"]{background:#9fc0d6;border-color:#9fc0d6;color:#141a12;}
+  #rainbox{transition:opacity .18s;}
+  #rainbox.off{opacity:.34;pointer-events:none;}
+  #panel{max-height:calc(100vh - 32px);overflow-y:auto;scrollbar-width:thin;}
+  input[type=range]::-moz-range-track{height:4px;border-radius:2px;
+    background:linear-gradient(90deg,#2e7d3a,#7fae4e 40%,#c2a95e 72%,#a8853f);}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;height:15px;border-radius:50%;
+    background:#e8b13a;border:2px solid #161a12;margin-top:-6px;box-shadow:0 0 0 1px #e8b13a;}
+  input[type=range]::-moz-range-thumb{width:13px;height:13px;border-radius:50%;
+    background:#e8b13a;border:2px solid #161a12;box-shadow:0 0 0 1px #e8b13a;}
+  .ends{display:flex;justify-content:space-between;color:#9aa88a;font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;}
+  #story{margin-top:10px;font-size:11.5px;line-height:1.45;color:#cbd2bc;min-height:32px;font-style:italic;}
+  .legend{display:grid;grid-template-columns:1fr 1fr;gap:5px 10px;margin-top:12px;font-size:11.5px;color:#bcc4ae;}
+  .legend div{display:flex;align-items:center;gap:7px;}
+  .sw{width:11px;height:11px;border-radius:2.5px;flex:none;box-shadow:inset 0 0 0 1px rgba(0,0,0,.35);}
+  .toggles{display:grid;grid-template-columns:1fr 1fr;gap:6px 10px;margin-top:13px;font-size:12px;}
+  label.t{display:flex;align-items:center;gap:7px;cursor:pointer;color:#bcc4ae;}
+  label.t input{accent-color:#e8b13a;width:13px;height:13px;cursor:pointer;}
+  .hint{margin-top:12px;color:#7f8a70;font-size:10.5px;letter-spacing:.05em;}
+  #fps{position:absolute;bottom:14px;right:16px;color:#65705a;font-size:11px;font-variant-numeric:tabular-nums;}
+  #err{position:absolute;inset:0;display:none;place-items:center;padding:40px;text-align:center;color:#e0d3c0;}
+
+  /* ---- district markers, pinned to the ground ---------------------------- */
+  #pins{position:absolute;inset:0;overflow:hidden;pointer-events:none;}
+  #pins.hide{display:none;}
+  .pin{position:absolute;left:0;top:0;display:flex;flex-direction:column;align-items:center;
+    transform-origin:50% 100%;will-change:transform;pointer-events:none;}
+  .pin .pill{display:flex;align-items:center;gap:8px;padding:5px 13px 5px 5px;border-radius:999px;
+    background:rgba(14,19,26,.90);border:1px solid rgba(255,255,255,.14);
+    box-shadow:0 6px 20px rgba(0,0,0,.55), 0 0 0 3px color-mix(in srgb, var(--c) 22%, transparent);
+    pointer-events:auto;cursor:pointer;white-space:nowrap;
+    transition:transform .16s ease, box-shadow .16s ease;}
+  .pin .pill:hover{transform:translateY(-1px);
+    box-shadow:0 8px 26px rgba(0,0,0,.6), 0 0 0 4px color-mix(in srgb, var(--c) 40%, transparent);}
+  .pin .ico{width:24px;height:24px;border-radius:50%;background:var(--c);flex:none;
+    display:grid;place-items:center;box-shadow:inset 0 -2px 5px rgba(0,0,0,.28);}
+  .pin .ico svg{width:14px;height:14px;fill:#fff;display:block;}
+  .pin .txt{font-size:11.5px;font-weight:700;letter-spacing:.11em;color:#f4f1ea;}
+  .pin .stem{width:2px;height:var(--stem,46px);
+    background:repeating-linear-gradient(to bottom,var(--c) 0 4px,transparent 4px 8px);
+    opacity:.92;}
+  .pin .dot{width:9px;height:9px;border-radius:50%;background:var(--c);margin-top:-1px;
+    box-shadow:0 0 0 3px color-mix(in srgb, var(--c) 30%, transparent), 0 0 10px var(--c);}
+  @media (max-width:560px){#panel{width:calc(100% - 32px);} .pin .txt{font-size:10px;}}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="err">This visualization needs WebGL2. Try a current version of Chrome, Edge, Firefox or Safari.</div>
+<div id="pins"></div>
+
+<div id="panel">
+  <h1>Ama's village</h1>
+  <div class="sub">Earth Engine · living simulation</div>
+
+  <div class="counts">
+    <span>Homes <b id="cB">—</b></span>
+    <span>Trees <b id="cT">—</b></span>
+    <span>Fields <b id="cF">—</b></span>
+    <span>People <b id="cW">—</b></span>
+  </div>
+
+  <div class="rule"></div>
+
+  <div class="seasonhead"><span>Season</span><span id="seasonlabel">1 of 12</span></div>
+  <input id="season" type="range" min="0" max="100" value="0" step="1" aria-label="Season, lush to drought">
+  <div class="ends"><span>Rains</span><span>Drought</span></div>
+  <div id="story">The harvest has always been enough.</div>
+
+  <div class="rule"></div>
+  <div class="seasonhead"><span>Sunlight</span><span id="sunlabel">Bright</span></div>
+  <input id="sun" type="range" min="0" max="100" value="60" step="1" aria-label="Sunlight intensity">
+  <div class="ends"><span>Overcast</span><span>Harsh noon</span></div>
+
+  <div class="rule"></div>
+  <button id="rainbtn" type="button" aria-pressed="false">Start rain</button>
+  <div id="rainbox" class="off">
+    <div class="seasonhead" style="margin-top:10px"><span>Rainfall</span><span id="rainlabel">Steady</span></div>
+    <input id="rain" type="range" min="5" max="100" value="45" step="1" aria-label="Rain intensity">
+    <div class="ends"><span>Drizzle</span><span>Downpour</span></div>
+  </div>
+
+  <div class="legend">
+    <div><i class="sw" id="sw0"></i>Canopy</div>
+    <div><i class="sw" id="sw1"></i>Bush</div>
+    <div><i class="sw" id="sw2"></i>Grass</div>
+    <div><i class="sw" id="sw3"></i>Cropland</div>
+    <div><i class="sw" id="sw4"></i>River</div>
+    <div><i class="sw" id="sw5"></i>Laterite</div>
+  </div>
+
+  <div class="toggles">
+    <label class="t"><input type="checkbox" id="tTrees" checked>Trees</label>
+    <label class="t"><input type="checkbox" id="tWater" checked>River</label>
+    <label class="t"><input type="checkbox" id="tWind" checked>Wind</label>
+    <label class="t"><input type="checkbox" id="tCrops" checked>Crops</label>
+    <label class="t"><input type="checkbox" id="tBirds" checked>Birds</label>
+    <label class="t"><input type="checkbox" id="tPeople" checked>People</label>
+    <label class="t"><input type="checkbox" id="tTraffic" checked>Traffic</label>
+    <label class="t"><input type="checkbox" id="tLabels" checked>Labels</label>
+  </div>
+
+  <div class="hint">drag rotate · scroll zoom · click a marker</div>
+</div>
+<div id="fps"></div>
+
+<script>
+"use strict";
+(function(){
+
+/* ==========================================================================
+   0.  Math, PRNG, noise
+   ========================================================================== */
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);
+  t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+const rnd = mulberry32(20260804);
+const R  = (a,b)=>a+(b-a)*rnd();
+const Ri = (a,b)=>Math.floor(a+(b-a+1)*rnd());
+const pick = arr=>arr[Math.floor(rnd()*arr.length)];
+const TAU = Math.PI*2;
+
+const PERM = new Uint8Array(512);
+(function(){const p=new Uint8Array(256);for(let i=0;i<256;i++)p[i]=i;
+  for(let i=255;i>0;i--){const j=Math.floor(rnd()*(i+1));const t=p[i];p[i]=p[j];p[j]=t;}
+  for(let i=0;i<512;i++)PERM[i]=p[i&255];})();
+function h2(ix,iz){return (PERM[(ix&255)+PERM[iz&255]]/255)*2-1;}
+function sm(t){return t*t*(3-2*t);}
+function vnoise(x,z){
+  const ix=Math.floor(x), iz=Math.floor(z), fx=sm(x-ix), fz=sm(z-iz);
+  const a=h2(ix,iz), b=h2(ix+1,iz), c=h2(ix,iz+1), d=h2(ix+1,iz+1);
+  return (a+(b-a)*fx)*(1-fz)+(c+(d-c)*fx)*fz;
+}
+function fbm(x,z){ return vnoise(x,z)*0.6 + vnoise(x*2.1+7,z*2.1+3)*0.3 + vnoise(x*4.3+13,z*4.3+9)*0.12; }
+
+function m4mul(a,b){const o=new Float32Array(16);
+  for(let i=0;i<4;i++)for(let j=0;j<4;j++){let s=0;for(let k=0;k<4;k++)s+=a[k*4+j]*b[i*4+k];o[i*4+j]=s;}return o;}
+function m4persp(f,asp,n,fa){const t=1/Math.tan(f/2);const o=new Float32Array(16);
+  o[0]=t/asp;o[5]=t;o[10]=(fa+n)/(n-fa);o[11]=-1;o[14]=2*fa*n/(n-fa);return o;}
+function m4look(e,c,u){
+  let zx=e[0]-c[0],zy=e[1]-c[1],zz=e[2]-c[2];
+  let l=Math.hypot(zx,zy,zz)||1; zx/=l;zy/=l;zz/=l;
+  let xx=u[1]*zz-u[2]*zy, xy=u[2]*zx-u[0]*zz, xz=u[0]*zy-u[1]*zx;
+  l=Math.hypot(xx,xy,xz)||1; xx/=l;xy/=l;xz/=l;
+  const yx=zy*xz-zz*xy, yy=zz*xx-zx*xz, yz=zx*xy-zy*xx;
+  const o=new Float32Array(16);
+  o[0]=xx;o[1]=yx;o[2]=zx;o[3]=0; o[4]=xy;o[5]=yy;o[6]=zy;o[7]=0;
+  o[8]=xz;o[9]=yz;o[10]=zz;o[11]=0;
+  o[12]=-(xx*e[0]+xy*e[1]+xz*e[2]); o[13]=-(yx*e[0]+yy*e[1]+yz*e[2]);
+  o[14]=-(zx*e[0]+zy*e[1]+zz*e[2]); o[15]=1; return o;
+}
+
+/* ==========================================================================
+   1.  Palette — sampled from the reference aerial
+   ========================================================================== */
+function hx(s){return [parseInt(s.substr(1,2),16)/255,parseInt(s.substr(3,2),16)/255,parseInt(s.substr(5,2),16)/255];}
+function mixc(a,b,t){return [a[0]+(b[0]-a[0])*t,a[1]+(b[1]-a[1])*t,a[2]+(b[2]-a[2])*t];}
+function jit(c,k){const f=1+(rnd()*2-1)*k;return [Math.min(1,c[0]*f),Math.min(1,c[1]*f),Math.min(1,c[2]*f)];}
+function shade(c,k){return [c[0]*k,c[1]*k,c[2]*k];}
+
+const PAL = {
+  // ground cover  [rains, drought]
+  earth:    [hx('#a86b34'), hx('#c79763')],   // laterite track / bare soil
+  swept:    [hx('#b8783c'), hx('#d3a670')],   // swept courtyard, brightest bare ground
+  forest:   [hx('#16301d'), hx('#4d4c2b')],   // deep canopy floor
+  bush:     [hx('#2f4d31'), hx('#6f6a3a')],
+  grass:    [hx('#5c6a2e'), hx('#a08f48')],
+  soil:     [hx('#6b5240'), hx('#8a6f55')],   // tilled field soil
+  crop:     [hx('#4a8a26'), hx('#9b8b3e')],   // standing crop
+  river:    [hx('#35566b'), hx('#6a6e55')],
+  rock:     [hx('#6e6659'), hx('#8b8274')],
+  // built
+  roof: [ {c:hx('#8a4a2c'),w:26}, {c:hx('#2f5a4e'),w:18}, {c:hx('#7a8794'),w:20},
+          {c:hx('#a3512d'),w:16}, {c:hx('#5b3f2a'),w:12}, {c:hx('#3f8f86'),w:8},
+          {c:hx('#9aa0a3'),w:14} ],
+  wall: [ {c:hx('#a8794f'),w:30}, {c:hx('#ded1bb'),w:16}, {c:hx('#c9a06a'),w:22},
+          {c:hx('#7d5c3f'),w:16}, {c:hx('#6f9c97'),w:6}, {c:hx('#7d94b5'),w:6},
+          {c:hx('#d9b45c'),w:6} ],
+  // vegetation
+  canopyL: [hx('#16301d'), hx('#24462a'), hx('#3a6330'), hx('#2b4c28')],
+  canopyD: [hx('#6b6432'), hx('#7d7434'), hx('#98883f'), hx('#8a7c39')],
+  palmL:   hx('#2b410e'), palmD: hx('#8a8134'),
+  planL:   hx('#4a8a26'), planD: hx('#9a8b3f'),
+  trunk:   hx('#5a4632'), palmTrunk: hx('#7d6a4e'),
+  // materials
+  asphalt: [hx('#33363c'), hx('#43454a')],
+  line:    [hx('#d8d2c4'), hx('#e2dcce')],
+  steel:   [hx('#8f9299'), hx('#a0a29f')],
+  zinc:    [hx('#b9bcc0'), hx('#c6c5bd')],
+  concrete:[hx('#9c988c'), hx('#b0aa99')],
+  stone:   [hx('#8a8074'), hx('#9c9184')],
+  glass:   [hx('#1d2b3a'), hx('#2c3949')],
+  solar:   [hx('#16294a'), hx('#203250')],
+  white:   [hx('#e8e2d4'), hx('#efe8d8')],
+  green:   [hx('#3f7d4e'), hx('#5c8a52')],
+  red:     [hx('#c0392b'), hx('#c9553f')],
+  dark:    [hx('#2a2622'), hx('#3a352e')],
+};
+function wpick(l){let t=0;for(const e of l)t+=e.w;let r=rnd()*t;for(const e of l){r-=e.w;if(r<=0)return e.c;}return l[0].c;}
+// market parasols, taken straight off the reference
+const PARASOL=[hx('#c9422f'),hx('#2f6fb0'),hx('#e0a92c'),hx('#3f9e8c'),
+               hx('#d8663a'),hx('#7a4b96'),hx('#cf8f2a'),hx('#4a8f4a'),
+               hx('#d94f6a'),hx('#e6d2a8')];
+
+/* ==========================================================================
+   2.  Mesh accumulator + solid primitives
+   ========================================================================== */
+function Mesh(){ this.p=[]; this.n=[]; this.a=[]; this.b=[]; }
+Mesh.prototype.tri=function(P1,P2,P3,N,ca,cb){
+  const p=this.p,n=this.n,a=this.a,b=this.b;
+  p.push(P1[0],P1[1],P1[2],P2[0],P2[1],P2[2],P3[0],P3[1],P3[2]);
+  for(let i=0;i<3;i++){n.push(N[0],N[1],N[2]);a.push(ca[0],ca[1],ca[2]);b.push(cb[0],cb[1],cb[2]);}
+};
+Mesh.prototype.quad=function(P1,P2,P3,P4,ca,cb,N){
+  if(!N){
+    const ux=P2[0]-P1[0],uy=P2[1]-P1[1],uz=P2[2]-P1[2];
+    const vx=P3[0]-P1[0],vy=P3[1]-P1[1],vz=P3[2]-P1[2];
+    let nx=vy*uz-vz*uy, ny=vz*ux-vx*uz, nz=vx*uy-vy*ux;   // v x u
+    const l=Math.hypot(nx,ny,nz)||1; N=[nx/l,ny/l,nz/l];
+  }
+  this.tri(P1,P2,P3,N,ca,cb); this.tri(P1,P3,P4,N,ca,cb);
+};
+/* per-corner colours, so the ground grades instead of tiling */
+Mesh.prototype.triV=function(P1,P2,P3,N,A,B){
+  const p=this.p,n=this.n,a=this.a,b=this.b, P=[P1,P2,P3];
+  for(let i=0;i<3;i++){
+    p.push(P[i][0],P[i][1],P[i][2]); n.push(N[0],N[1],N[2]);
+    a.push(A[i][0],A[i][1],A[i][2]); b.push(B[i][0],B[i][1],B[i][2]);
+  }
+};
+Mesh.prototype.quadV=function(P1,P2,P3,P4,A,B,N){
+  this.triV(P1,P2,P3,N,[A[0],A[1],A[2]],[B[0],B[1],B[2]]);
+  this.triV(P1,P3,P4,N,[A[0],A[2],A[3]],[B[0],B[2],B[3]]);
+};
+Mesh.prototype.count=function(){return this.p.length/3;};
+
+/* box, centred on (cx,cy,cz), yaw about Y */
+function boxM(m,cx,cy,cz,sx,sy,sz,cA,cB,ang){
+  const ca=Math.cos(ang||0), sa=Math.sin(ang||0);
+  const hx2=sx/2,hy=sy/2,hz=sz/2;
+  const V=[[-hx2,-hy,-hz],[hx2,-hy,-hz],[hx2,hy,-hz],[-hx2,hy,-hz],
+           [-hx2,-hy, hz],[hx2,-hy, hz],[hx2,hy, hz],[-hx2,hy, hz]]
+    .map(v=>[cx+v[0]*ca-v[2]*sa, cy+v[1], cz+v[0]*sa+v[2]*ca]);
+  const F=[[0,1,2,3],[5,4,7,6],[4,0,3,7],[1,5,6,2],[3,2,6,7],[4,5,1,0]];
+  for(const f of F) m.quad(V[f[0]],V[f[1]],V[f[2]],V[f[3]],cA,cB);
+}
+/* vertical cylinder / truncated cone standing on (cx,cy,cz) */
+function cylM(m,cx,cy,cz,r0,r1,h,seg,cA,cB,capTop){
+  for(let i=0;i<seg;i++){
+    const a0=i/seg*TAU, a1=(i+1)/seg*TAU, am=(a0+a1)/2;
+    const A0=[cx+Math.cos(a0)*r0,cy,cz+Math.sin(a0)*r0], B0=[cx+Math.cos(a1)*r0,cy,cz+Math.sin(a1)*r0];
+    const B1=[cx+Math.cos(a1)*r1,cy+h,cz+Math.sin(a1)*r1], A1=[cx+Math.cos(a0)*r1,cy+h,cz+Math.sin(a0)*r1];
+    const sh=0.90+0.16*Math.cos(am-0.9);
+    m.quad(A0,B0,B1,A1,shade(cA,sh),shade(cB,sh),[Math.cos(am),0.08,Math.sin(am)]);
+  }
+  if(capTop!==false) for(let i=0;i<seg;i++){
+    const a0=i/seg*TAU, a1=(i+1)/seg*TAU;
+    m.tri([cx+Math.cos(a0)*r1,cy+h,cz+Math.sin(a0)*r1],[cx+Math.cos(a1)*r1,cy+h,cz+Math.sin(a1)*r1],
+          [cx,cy+h,cz],[0,1,0],shade(cA,1.06),shade(cB,1.06));
+  }
+}
+function coneM(m,cx,cy,cz,r,h,seg,cA,cB){
+  for(let i=0;i<seg;i++){
+    const a0=i/seg*TAU, a1=(i+1)/seg*TAU, am=(a0+a1)/2;
+    const sh=0.88+0.20*Math.cos(am-0.9);
+    m.tri([cx+Math.cos(a0)*r,cy,cz+Math.sin(a0)*r],[cx+Math.cos(a1)*r,cy,cz+Math.sin(a1)*r],[cx,cy+h,cz],
+      [Math.cos(am)*0.6,0.72,Math.sin(am)*0.6],shade(cA,sh),shade(cB,sh));
+  }
+}
+/* square beam between two points — struts, rails, poles at any angle */
+function beam(m,A,B,w,cA,cB){
+  let dx=B[0]-A[0],dy=B[1]-A[1],dz=B[2]-A[2];
+  const L=Math.hypot(dx,dy,dz)||1; dx/=L;dy/=L;dz/=L;
+  let ux=0,uy=1,uz=0;
+  if(Math.abs(dy)>0.94){ux=1;uy=0;uz=0;}
+  let px=uy*dz-uz*dy, py=uz*dx-ux*dz, pz=ux*dy-uy*dx;
+  let l=Math.hypot(px,py,pz)||1; px/=l;py/=l;pz/=l;
+  const qx=dy*pz-dz*py, qy=dz*px-dx*pz, qz=dx*py-dy*px;
+  const h=w/2, C=[[-h,-h],[h,-h],[h,h],[-h,h]];
+  const P=(t,k)=>[A[0]+dx*L*t+px*C[k][0]+qx*C[k][1],
+                  A[1]+dy*L*t+py*C[k][0]+qy*C[k][1],
+                  A[2]+dz*L*t+pz*C[k][0]+qz*C[k][1]];
+  for(let k=0;k<4;k++){const k2=(k+1)%4; m.quad(P(0,k),P(0,k2),P(1,k2),P(1,k),cA,cB);}
+}
+/* flat panel, tilted about its local X then yawed — solar arrays, signs */
+function panelM(m,cx,cy,cz,w,d,tilt,ang,cA,cB){
+  const ct=Math.cos(tilt), st=Math.sin(tilt), ca=Math.cos(ang), sa=Math.sin(ang);
+  const P=(u,v)=>{ const y=cy+v*st, z2=v*ct;
+    return [cx+u*ca-z2*sa, y, cz+u*sa+z2*ca]; };
+  const A=P(-w/2,-d/2), B=P(w/2,-d/2), C=P(w/2,d/2), D=P(-w/2,d/2);
+  m.quad(A,B,C,D,cA,cB);
+  m.quad(D,C,B,A,shade(cA,0.55),shade(cB,0.55));
+}
+
+/* ==========================================================================
+   3.  The valley — river course traced from the reference frame
+   ========================================================================== */
+const EXT = 520;                       // half-extent, metres  (≈1 km across)
+const stats={bld:0,tree:0,field:0,rock:0,people:0};
+
+// the river enters top-centre, swings west behind the village, then turns
+// south-east and runs out under the road bridge
+const RAW = [[100,-620],[60,-470],[15,-355],[-50,-245],[-115,-135],[-150,-15],
+             [-125,105],[-60,200],[-5,270],[60,330],[115,398],[205,468],[340,545],[500,640]];
+function spline(pts,div){
+  const out=[];
+  for(let i=0;i<pts.length-1;i++){
+    const p0=pts[Math.max(0,i-1)], p1=pts[i], p2=pts[i+1], p3=pts[Math.min(pts.length-1,i+2)];
+    for(let s=0;s<div;s++){
+      const t=s/div, t2=t*t, t3=t2*t;
+      out.push([
+        0.5*((2*p1[0])+(-p0[0]+p2[0])*t+(2*p0[0]-5*p1[0]+4*p2[0]-p3[0])*t2+(-p0[0]+3*p1[0]-3*p2[0]+p3[0])*t3),
+        0.5*((2*p1[1])+(-p0[1]+p2[1])*t+(2*p0[1]-5*p1[1]+4*p2[1]-p3[1])*t2+(-p0[1]+3*p1[1]-3*p2[1]+p3[1])*t3)
+      ]);
+    }
+  }
+  out.push(pts[pts.length-1]); return out;
+}
+const RIVER = spline(RAW, 7);
+function riverWidth(t){ return 19 + 6.5*Math.sin(t*2.4+0.6) + 4*vnoise(t*5,3); }  // half-width, m
+
+function distToPoly(px,pz,poly){
+  let best=1e9, bt=0;
+  for(let i=0;i<poly.length-1;i++){
+    const ax=poly[i][0],az=poly[i][1],bx=poly[i+1][0],bz=poly[i+1][1];
+    const dx=bx-ax,dz=bz-az,L2=dx*dx+dz*dz||1;
+    let t=((px-ax)*dx+(pz-az)*dz)/L2; t=t<0?0:(t>1?1:t);
+    const d=Math.hypot(px-(ax+dx*t), pz-(az+dz*t));
+    if(d<best){best=d; bt=(i+t)/(poly.length-1);}
+  }
+  return [best,bt];
+}
+const dRiver = (x,z)=>distToPoly(x,z,RIVER);
+
+// terrain: a shallow valley floor at the river rising to wooded slopes
+const BEDY = t => -5.0 - t*4.4;              // bed falls downstream
+const WATERY = t => BEDY(t) + 2.1;           // free surface, perfectly smooth
+function terrainH(x,z){
+  const [d,t]=dRiver(x,z);
+  const hw=riverWidth(t);
+  const bank = Math.min(1,Math.max(0,(d-hw)/150));
+  const rough = Math.pow(bank,0.55);
+  return BEDY(t) + Math.pow(bank,0.66)*21
+       + (2.4*fbm(x/330,z/330) + 0.85*fbm(x/95,z/95)) * rough;
+}
+
+/* ==========================================================================
+   4.  Cover field
+   ========================================================================== */
+// 0 earth · 1 forest · 2 bush · 3 grass · 4 soil · 5 crop · 6 swept
+const GN=138, GS=(EXT*2)/GN;
+const cover=new Uint8Array((GN+1)*(GN+1));
+function setCoverRect(x0,z0,x1,z1,c,soft){
+  const i0=Math.max(0,Math.floor((x0+EXT)/GS)), i1=Math.min(GN,Math.ceil((x1+EXT)/GS));
+  const j0=Math.max(0,Math.floor((z0+EXT)/GS)), j1=Math.min(GN,Math.ceil((z1+EXT)/GS));
+  for(let j=j0;j<=j1;j++)for(let i=i0;i<=i1;i++){
+    if(soft && rnd()<0.25) continue;
+    cover[j*(GN+1)+i]=c;
+  }
+}
+function setCoverDisc(x,z,r,c){
+  const i0=Math.max(0,Math.floor((x-r+EXT)/GS)), i1=Math.min(GN,Math.ceil((x+r+EXT)/GS));
+  const j0=Math.max(0,Math.floor((z-r+EXT)/GS)), j1=Math.min(GN,Math.ceil((z+r+EXT)/GS));
+  for(let j=j0;j<=j1;j++)for(let i=i0;i<=i1;i++){
+    const gx=-EXT+i*GS, gz=-EXT+j*GS;
+    if(Math.hypot(gx-x,gz-z)<=r*(0.82+0.3*vnoise(gx/34,gz/34))) cover[j*(GN+1)+i]=c;
+  }
+}
+// base cover: closed forest east and along the water, open farmland and
+// pasture west, bush between — the split you see across the reference
+for(let j=0;j<=GN;j++)for(let i=0;i<=GN;i++){
+  const x=-EXT+i*GS, z=-EXT+j*GS;
+  const [d,t]=dRiver(x,z), hw=riverWidth(t);
+  const n=fbm(x/210,z/210);
+  let c;
+  if(d < hw+34)                      c=1;                 // riparian belt
+  else if(x>170 && z<-140)           c = n>-0.34 ? 1 : 2; // the eastern forest block
+  else if(x<-150 && z<-90)           c = n>0.22 ? 2 : 3;  // farmland / pasture
+  else if(n>0.10)                    c=1;
+  else if(n>-0.30)                   c=2;
+  else                               c=3;
+  cover[j*(GN+1)+i]=c;
+}
+// the settled core is open ground with scattered shade, not closed canopy
+for(let j=0;j<=GN;j++)for(let i=0;i<=GN;i++){
+  const x=-EXT+i*GS, z=-EXT+j*GS;
+  const dv=Math.hypot((x-30)*0.86,(z-130)*1.05);
+  if(dv<330 && cover[j*(GN+1)+i]===1){
+    const n=fbm(x/120+9,z/120+4);
+    cover[j*(GN+1)+i] = n>0.30?1:(n>-0.18?2:3);
+  }
+}
+
+/* ==========================================================================
+   5.  Meshes
+   ========================================================================== */
+const world=new Mesh();      // terrain, tracks, roads, rocks
+const built=new Mesh();      // everything people put up
+const crops=new Mesh();
+const water={p:[],e:[]};
+const trees={broad:[],palm:[],plantain:[]};
+
+/* ---- dirt tracks --------------------------------------------------------- */
+const PATHS=[];
+function track(poly,width,col,colD){
+  PATHS.push(poly);
+  const hw=width/2;
+  for(let i=0;i<poly.length-1;i++){
+    const ax=poly[i][0],az=poly[i][1],bx=poly[i+1][0],bz=poly[i+1][1];
+    const dx=bx-ax,dz=bz-az,L=Math.hypot(dx,dz); if(L<0.4)continue;
+    const steps=Math.max(1,Math.ceil(L/7));
+    const nx=-dz/L*hw, nz=dx/L*hw;
+    for(let s=0;s<steps;s++){
+      const t0=s/steps,t1=(s+1)/steps;
+      const x0=ax+dx*t0,z0=az+dz*t0,x1=ax+dx*t1,z1=az+dz*t1;
+      const j=1+(rnd()*2-1)*0.06;
+      world.quad(
+        [x0+nx,terrainH(x0+nx,z0+nz)+0.12,z0+nz],[x1+nx,terrainH(x1+nx,z1+nz)+0.12,z1+nz],
+        [x1-nx,terrainH(x1-nx,z1-nz)+0.12,z1-nz],[x0-nx,terrainH(x0-nx,z0-nz)+0.12,z0-nz],
+        [col[0]*j,col[1]*j,col[2]*j],[colD[0]*j,colD[1]*j,colD[2]*j],[0,1,0]);
+      setCoverDisc((x0+x1)/2,(z0+z1)/2,hw*1.1,0);
+    }
+  }
+}
+
+/* ---- the tarred road ----------------------------------------------------- */
+const ROADS=[];
+function road(poly,width,deck){
+  // surface height per point; over the bridge span it holds the deck level
+  const ys=poly.map(p=>terrainH(p[0],p[1])+0.16);
+  if(deck) for(let i=0;i<poly.length;i++){
+    const d=Math.hypot(poly[i][0]-deck.x, poly[i][1]-deck.z);
+    if(d<deck.span) ys[i]=deck.y;
+    else if(d<deck.span+deck.ramp){ const s=sm((d-deck.span)/deck.ramp); ys[i]=deck.y+(ys[i]-deck.y)*s; }
+  }
+  const hw=width/2, sh=hw*1.34;
+  let run=0;
+  for(let i=0;i<poly.length-1;i++){
+    const ax=poly[i][0],az=poly[i][1],bx=poly[i+1][0],bz=poly[i+1][1];
+    const dx=bx-ax,dz=bz-az,L=Math.hypot(dx,dz); if(L<0.4)continue;
+    const nx=-dz/L, nz=dx/L;
+    const y0=ys[i], y1=ys[i+1];
+    const onDeck = deck && Math.hypot((ax+bx)/2-deck.x,(az+bz)/2-deck.z) < deck.span;
+    // gravel shoulder
+    if(!onDeck) world.quad(
+      [ax+nx*sh,terrainH(ax+nx*sh,az+nz*sh)+0.10,az+nz*sh],[bx+nx*sh,terrainH(bx+nx*sh,bz+nz*sh)+0.10,bz+nz*sh],
+      [bx-nx*sh,terrainH(bx-nx*sh,bz-nz*sh)+0.10,bz-nz*sh],[ax-nx*sh,terrainH(ax-nx*sh,az-nz*sh)+0.10,az-nz*sh],
+      PAL.earth[0],PAL.earth[1],[0,1,0]);
+    // carriageway
+    world.quad([ax+nx*hw,y0+0.18,az+nz*hw],[bx+nx*hw,y1+0.18,bz+nz*hw],
+               [bx-nx*hw,y1+0.18,bz-nz*hw],[ax-nx*hw,y0+0.18,az-nz*hw],
+               PAL.asphalt[0],PAL.asphalt[1],[0,1,0]);
+    // broken centre line
+    for(let s=run; s<L; s+=15){
+      const t0=s/L, t1=Math.min(1,(s+5.5)/L);
+      const p0x=ax+dx*t0,p0z=az+dz*t0,p1x=ax+dx*t1,p1z=az+dz*t1;
+      const q0=y0+(y1-y0)*t0+0.30, q1=y0+(y1-y0)*t1+0.30, w=0.42;
+      world.quad([p0x+nx*w,q0,p0z+nz*w],[p1x+nx*w,q1,p1z+nz*w],
+                 [p1x-nx*w,q1,p1z-nz*w],[p0x-nx*w,q0,p0z-nz*w],
+                 PAL.line[0],PAL.line[1],[0,1,0]);
+    }
+    run=(run+ (Math.ceil((L-run)/15)*15 - L))%15; if(run<0) run+=15;
+    for(let s=0;s<L;s+=8) setCoverDisc(ax+dx*(s/L),az+dz*(s/L),sh*1.15,0);
+  }
+  const P={poly,ys,cum:[0],L:0};
+  for(let i=1;i<poly.length;i++){P.L+=Math.hypot(poly[i][0]-poly[i-1][0],poly[i][1]-poly[i-1][1]);P.cum.push(P.L);}
+  P.at=function(s){
+    s=Math.max(0,Math.min(this.L,s));
+    let i=1; while(i<this.cum.length-1 && this.cum[i]<s) i++;
+    const t=(s-this.cum[i-1])/Math.max(1e-4,this.cum[i]-this.cum[i-1]);
+    const a=this.poly[i-1], b=this.poly[i];
+    const dx=b[0]-a[0], dz=b[1]-a[1], l=Math.hypot(dx,dz)||1;
+    return {x:a[0]+dx*t, z:a[1]+dz*t, y:this.ys[i-1]+(this.ys[i]-this.ys[i-1])*t, dx:dx/l, dz:dz/l};
+  };
+  ROADS.push(P); return P;
+}
+
+/* ---- river --------------------------------------------------------------- */
+(function buildRiver(){
+  const push=v=>{water.p.push(v[0],v[1],v[2]); water.e.push(v[3]);};
+  const NRM=[];
+  for(let i=0;i<RIVER.length;i++){
+    const a=RIVER[Math.max(0,i-1)], b=RIVER[Math.min(RIVER.length-1,i+1)];
+    const dx=b[0]-a[0], dz=b[1]-a[1], L=Math.hypot(dx,dz)||1;
+    NRM.push([-dz/L, dx/L]);
+  }
+  const EDGE=[];
+  for(let i=0;i<RIVER.length;i++){
+    const t=i/(RIVER.length-1), w=riverWidth(t), y=WATERY(t);
+    EDGE.push({ l:[RIVER[i][0]+NRM[i][0]*w, y, RIVER[i][1]+NRM[i][1]*w, 1],
+                m:[RIVER[i][0], y, RIVER[i][1], 0],
+                r:[RIVER[i][0]-NRM[i][0]*w, y, RIVER[i][1]-NRM[i][1]*w, 1] });
+  }
+  for(let i=0;i<EDGE.length-1;i++){
+    const A=EDGE[i], B=EDGE[i+1];
+    push(A.l);push(B.l);push(B.m);  push(A.l);push(B.m);push(A.m);
+    push(A.m);push(B.m);push(B.r);  push(A.m);push(B.r);push(A.r);
+  }
+  // rapids: boulders that surface as the river falls
+  for(let i=2;i<RIVER.length-2;i+=1){
+    const t=i/(RIVER.length-1);
+    if(vnoise(t*9,2)<0.02) continue;
+    const n=Ri(2,6);
+    for(let k=0;k<n;k++){
+      const off=R(-0.9,0.9)*riverWidth(t);
+      const a=RIVER[i], b=RIVER[i+1];
+      const dx=b[0]-a[0],dz=b[1]-a[1],L=Math.hypot(dx,dz)||1;
+      const x=a[0]-dz/L*off + R(-5,5), z=a[1]+dx/L*off + R(-5,5);
+      const y=WATERY(t)-R(0.8,1.8), r=R(0.9,2.6), h=R(1.0,2.4);
+      const c=jit(PAL.rock[0],0.12), cd=jit(PAL.rock[1],0.1);
+      const S=5;
+      for(let s=0;s<S;s++){
+        const a0=s/S*TAU,a1=(s+1)/S*TAU;
+        world.tri([x+Math.cos(a0)*r,y,z+Math.sin(a0)*r],[x+Math.cos(a1)*r,y,z+Math.sin(a1)*r],[x,y+h,z],
+          [Math.cos((a0+a1)/2),0.55,Math.sin((a0+a1)/2)],c,cd);
+      }
+      stats.rock++;
+    }
+  }
+})();
+
+/* ---- crop fields --------------------------------------------------------- */
+const FIELDSOK=[];
+function cropField(cx,cz,hw,hd,ang){
+  const ca=Math.cos(ang), sa=Math.sin(ang);
+  const rowW=R(1.9,2.7), rows=Math.max(3,Math.floor(hd*2/rowW));
+  const fallow=rnd()<0.20;
+  const soilL=jit(PAL.soil[0],0.10), soilD=jit(PAL.soil[1],0.08);
+  const cropL=fallow?jit(PAL.soil[0],0.12):jit(PAL.crop[0],0.20);
+  const cropD=fallow?jit(PAL.soil[1],0.10):jit(PAL.crop[1],0.14);
+  const T=(u,v)=>{ const x=cx+u*ca-v*sa, z=cz+u*sa+v*ca; return [x,terrainH(x,z),z]; };
+  for(let r=0;r<rows;r++){
+    const v0=-hd+r*rowW, v1=v0+rowW*0.62;
+    const A=T(-hw,v0), B=T(hw,v0), C=T(hw,v1), D=T(-hw,v1);
+    const ridge=fallow?0.12:0.30;
+    crops.quad([A[0],A[1]+ridge,A[2]],[B[0],B[1]+ridge,B[2]],[C[0],C[1]+ridge,C[2]],[D[0],D[1]+ridge,D[2]],
+               cropL,cropD,[0,1,0]);
+    crops.quad([D[0],D[1]+ridge,D[2]],[C[0],C[1]+ridge,C[2]],
+               [C[0],C[1]+0.02,C[2]+rowW*0.38],[D[0],D[1]+0.02,D[2]+rowW*0.38], soilL,soilD);
+  }
+  setCoverRect(cx-hw-2,cz-hd-2,cx+hw+2,cz+hd+2,4);
+  FIELDSOK.push([cx,cz,hw,hd,ang]);
+  stats.field++;
+}
+
+/* ---- buildings -----------------------------------------------------------
+   walls, a corrugated pitched roof laid in strips, optional veranda posts   */
+function building(o){
+  const x=o.x, z=o.z, hw=o.hw, hd=o.hd, ang=o.ang||0;
+  const ca=Math.cos(ang), sa=Math.sin(ang);
+  const T=(u,v,y)=>[x+u*ca-v*sa, y, z+u*sa+v*ca];
+  const base = o.baseY!==undefined ? o.baseY : terrainH(x,z);
+  const wc=o.wall||wpick(PAL.wall), rc=o.roof||wpick(PAL.roof);
+  const wd=mixc(wc,PAL.earth[1],0.20), rd=mixc(rc,PAL.earth[1],0.14);
+  const lv=o.levels||1;
+  const top=base+lv*3.5*(o.hscale||1), y0=base-2.4;
+  const C=[[-hw,-hd],[hw,-hd],[hw,hd],[-hw,hd]];
+  for(let i=0;i<4;i++){const a=C[i],b=C[(i+1)%4];
+    built.quad(T(a[0],a[1],y0),T(b[0],b[1],y0),T(b[0],b[1],top),T(a[0],a[1],top),wc,wd);}
+  // a painted plinth band, the way village walls are finished
+  if(o.plinth!==false){
+    const pb=mixc(wc,PAL.dark[0],0.42), py=base+0.85;
+    for(let i=0;i<4;i++){const a=C[i],b=C[(i+1)%4];
+      built.quad(T(a[0]*1.004,a[1]*1.004,y0),T(b[0]*1.004,b[1]*1.004,y0),
+                 T(b[0]*1.004,b[1]*1.004,py),T(a[0]*1.004,a[1]*1.004,py),pb,mixc(pb,PAL.earth[1],0.2));}
+  }
+  // windows + a door, punched on the long faces
+  if(o.windows!==false && hw>3.4){
+    const gc=o.trim||PAL.glass[0], gd=PAL.glass[1];
+    const n=Math.max(1,Math.round(hw/4.2));
+    for(let s=-1;s<=1;s+=2) for(let k=0;k<n;k++){
+      const u=-hw+ (k+0.5)*(2*hw/n), wv=Math.min(1.5,hw/n*0.42), y=base+1.55*(o.hscale||1);
+      const v=s*(hd+0.10);
+      built.quad(T(u-wv,v,y-0.62),T(u+wv,v,y-0.62),T(u+wv,v,y+0.62),T(u-wv,v,y+0.62),
+        s<0?gc:gd, s<0?gd:gc, [-sa*s, 0, ca*s]);
+    }
+  }
+  // roof
+  const ov=o.eave!==undefined?o.eave:R(0.35,0.75), ehw=hw+ov, ehd=hd+ov;
+  const rh=Math.min(hw,hd)*(o.pitch||R(0.34,0.46))+0.4, ry=top+rh;
+  const hip=o.hip!==false;
+  const along = ehw>=ehd;                       // ridge runs along the long axis
+  const HL = along?ehw:ehd, HD = along?ehd:ehw;
+  const rl = hip? Math.max(0,HL-HD) : HL;
+  const N=Math.max(6,Math.min(46,Math.round(HL*0.9)));
+  for(let side=-1;side<=1;side+=2) for(let k=0;k<N;k++){
+    const u0=-HL+k*(2*HL/N), u1=u0+2*HL/N;
+    const r0=Math.max(-rl,Math.min(rl,u0)), r1=Math.max(-rl,Math.min(rl,u1));
+    const g=(k%2)?1.0:0.90;                     // corrugation
+    const cl=shade(rc,g*(side<0?1.06:0.90)), cdk=shade(rd,g*(side<0?1.06:0.90));
+    const A=along?T(u0,side*HD,top):T(side*HD,u0,top);
+    const B=along?T(u1,side*HD,top):T(side*HD,u1,top);
+    const Cc=along?T(r1,0,ry):T(0,r1,ry);
+    const D=along?T(r0,0,ry):T(0,r0,ry);
+    if(side<0) built.quad(A,B,Cc,D,cl,cdk); else built.quad(B,A,D,Cc,cl,cdk);
+  }
+  if(!hip){                                     // gable ends
+    for(let s=-1;s<=1;s+=2){
+      const A=along?T(s*HL,-HD,top):T(-HD,s*HL,top);
+      const B=along?T(s*HL, HD,top):T( HD,s*HL,top);
+      const Cc=along?T(s*HL,0,ry):T(0,s*HL,ry);
+      built.tri(A,B,Cc,[s*ca,0.3,s*sa],shade(wc,1.04),shade(wd,1.04));
+    }
+  } else {
+    for(let s=-1;s<=1;s+=2){
+      const A=along?T(s*HL,-HD,top):T(-HD,s*HL,top);
+      const B=along?T(s*HL, HD,top):T( HD,s*HL,top);
+      const Cc=along?T(s*rl,0,ry):T(0,s*rl,ry);
+      built.tri(A,B,Cc,[s*ca,0.45,s*sa],shade(rc,0.94),shade(rd,0.94));
+    }
+  }
+  // eaves fascia
+  const fy=top-0.34;
+  const E=[[-ehw,-ehd],[ehw,-ehd],[ehw,ehd],[-ehw,ehd]];
+  for(let i=0;i<4;i++){const a=E[i],b=E[(i+1)%4];
+    built.quad(T(a[0],a[1],fy),T(b[0],b[1],fy),T(b[0],b[1],top),T(a[0],a[1],top),
+      shade(rc,0.78),shade(rd,0.78));}
+  // veranda: a shaded walk along the front, posts to the ground
+  if(o.veranda){
+    const vd=o.veranda, y=top-0.15;
+    built.quad(T(-ehw,ehd,y),T(ehw,ehd,y),T(ehw,ehd+vd,y-0.35),T(-ehw,ehd+vd,y-0.35),
+      shade(rc,0.84),shade(rd,0.84),[0,1,0]);
+    const np=Math.max(2,Math.round(hw/3.4));
+    for(let k=0;k<=np;k++){
+      const u=-ehw+k*(2*ehw/np), p=T(u,ehd+vd*0.86,0);
+      beam(built,[p[0],base-0.6,p[2]],[p[0],y-0.35,p[2]],0.34,shade(wc,0.92),shade(wd,0.92));
+    }
+    built.quad(T(-ehw,ehd,base+0.30),T(ehw,ehd,base+0.30),
+               T(ehw,ehd+vd,base+0.22),T(-ehw,ehd+vd,base+0.22),
+               PAL.concrete[0],PAL.concrete[1],[0,1,0]);
+  }
+  stats.bld++;
+  return {top,base,ehw,ehd,T};
+}
+function house(cx,cz,hw,hd,levels,forceRoof){
+  return building({x:cx,z:cz,hw:hw,hd:hd,levels:levels,roof:forceRoof,ang:R(-0.5,0.5),
+                   windows:hw>4.6});
+}
+
+/* ==========================================================================
+   6.  Landmarks — the things the reference frame is labelled around
+   ========================================================================== */
+const D = {                                   // district anchors
+  agri:  [-300,-250], water:[105,-315], forest:[330,-360], energy:[440,-120],
+  school:[ 120, -30], health:[330, 150], market:[-235, 340], homes:[-300,442],
+  infra: [ 115, 398]
+};
+
+/* ---- the road bridge ----------------------------------------------------- */
+const BR = {x:D.infra[0], z:D.infra[1]};
+(function(){ const [,t]=dRiver(BR.x,BR.z); BR.t=t; BR.y=WATERY(t)+9.4; BR.ang=-0.178; })();
+
+function bridge(){
+  const ca=Math.cos(BR.ang), sa=Math.sin(BR.ang);
+  const T=(u,v,y)=>[BR.x+u*ca-v*sa, y, BR.z+u*sa+v*ca];
+  const st=PAL.stone[0], sd=PAL.stone[1];
+  const HW=7.4, dy=BR.y, under=dy-1.7;
+  // deck slab
+  for(let i=0;i<4;i++){
+    const C=[[-44,-HW],[44,-HW],[44,HW],[-44,HW]], a=C[i], b=C[(i+1)%4];
+    built.quad(T(a[0],a[1],under),T(b[0],b[1],under),T(b[0],b[1],dy),T(a[0],a[1],dy),
+      shade(st,0.86),shade(sd,0.86));
+  }
+  built.quad(T(-44,-HW,under),T(44,-HW,under),T(44,HW,under),T(-44,HW,under),
+    shade(st,0.55),shade(sd,0.55),[0,-1,0]);
+  built.quad(T(-44,-HW,dy),T(44,-HW,dy),T(44,HW,dy),T(-44,HW,dy),
+    PAL.asphalt[0],PAL.asphalt[1],[0,1,0]);
+  for(let s=-30;s<=30;s+=15)                            // centre line across the span
+    built.quad(T(s,-0.42,dy+0.03),T(s+5.5,-0.42,dy+0.03),T(s+5.5,0.42,dy+0.03),T(s,0.42,dy+0.03),
+      PAL.line[0],PAL.line[1],[0,1,0]);
+  // parapets
+  for(let side=-1;side<=1;side+=2){
+    const v=side*(HW-0.55);
+    for(let i=0;i<4;i++){
+      const C=[[-44,v-0.45],[44,v-0.45],[44,v+0.45],[-44,v+0.45]], a=C[i], b=C[(i+1)%4];
+      built.quad(T(a[0],a[1],dy),T(b[0],b[1],dy),T(b[0],b[1],dy+1.25),T(a[0],a[1],dy+1.25),
+        shade(st,1.06),shade(sd,1.06));
+    }
+    built.quad(T(-44,v-0.45,dy+1.25),T(44,v-0.45,dy+1.25),T(44,v+0.45,dy+1.25),T(-44,v+0.45,dy+1.25),
+      shade(st,1.14),shade(sd,1.14),[0,1,0]);
+    for(let u=-40;u<=40;u+=8)                            // rail posts
+      boxM(built,...T(u,v,dy+1.9),1.0,1.3,1.0,shade(st,1.1),shade(sd,1.1),BR.ang);
+  }
+  // three arches on stone piers
+  const r=9, SEG=9;
+  for(const uc of [-23,0,23]){
+    const spr=dy-2.6-r;
+    for(let k=0;k<SEG;k++){
+      const a0=Math.PI-k/SEG*Math.PI, a1=Math.PI-(k+1)/SEG*Math.PI;
+      const u0=uc+Math.cos(a0)*r, y0=spr+Math.sin(a0)*r;
+      const u1=uc+Math.cos(a1)*r, y1=spr+Math.sin(a1)*r;
+      const nm=[Math.cos((a0+a1)/2)*ca, Math.sin((a0+a1)/2), Math.cos((a0+a1)/2)*sa];
+      built.quad(T(u0,-HW,y0),T(u1,-HW,y1),T(u1,HW,y1),T(u0,HW,y0),
+        shade(st,0.80),shade(sd,0.80),[-nm[0],-nm[1],-nm[2]]);
+      for(let side=-1;side<=1;side+=2){                 // spandrel faces
+        const v=side*HW;
+        built.quad(T(u0,v,y0),T(u1,v,y1),T(u1,v,under),T(u0,v,under),
+          shade(st,side<0?0.98:0.9),shade(sd,side<0?0.98:0.9),[-sa*side,0,ca*side]);
+      }
+    }
+  }
+  for(const up of [-11.5,11.5,-35.5,35.5]){             // piers and abutments
+    const w = Math.abs(up)>20?9:5;
+    const bed = BEDY(BR.t)-3;
+    for(let i=0;i<4;i++){
+      const C=[[up-w/2,-HW],[up+w/2,-HW],[up+w/2,HW],[up-w/2,HW]], a=C[i], b=C[(i+1)%4];
+      built.quad(T(a[0],a[1],bed),T(b[0],b[1],bed),T(b[0],b[1],under),T(a[0],a[1],under),
+        shade(st,0.92),shade(sd,0.92));
+    }
+  }
+}
+
+/* ---- water: the tower, the tanks, the standpipe -------------------------- */
+function waterWorks(x,z){
+  const y=terrainH(x,z), st=PAL.steel[0], sd=PAL.steel[1];
+  const H=19, legR=8.4, topR=4.0;
+  for(let i=0;i<4;i++){
+    const a=i/4*TAU+0.79;
+    const A=[x+Math.cos(a)*legR, y-1.2, z+Math.sin(a)*legR];
+    const B=[x+Math.cos(a)*topR, y+H,  z+Math.sin(a)*topR];
+    beam(built,A,B,0.72,st,sd);
+    const a2=(i+1)/4*TAU+0.79;
+    for(const f of [0.30,0.62,0.88]){                    // cross bracing
+      const P=[x+Math.cos(a)*(legR+(topR-legR)*f), y-1.2+(H+1.2)*f, z+Math.sin(a)*(legR+(topR-legR)*f)];
+      const Q=[x+Math.cos(a2)*(legR+(topR-legR)*f), y-1.2+(H+1.2)*f, z+Math.sin(a2)*(legR+(topR-legR)*f)];
+      beam(built,P,Q,0.30,shade(st,0.9),shade(sd,0.9));
+      const Q2=[x+Math.cos(a2)*(legR+(topR-legR)*(f+0.26)), y-1.2+(H+1.2)*(f+0.26), z+Math.sin(a2)*(legR+(topR-legR)*(f+0.26))];
+      if(f<0.7) beam(built,P,Q2,0.24,shade(st,0.85),shade(sd,0.85));
+    }
+  }
+  cylM(built,x,y+H,z,5.4,5.4,7.2,12,shade(st,1.05),shade(sd,1.05),false);
+  cylM(built,x,y+H-0.5,z,5.7,5.7,0.6,12,shade(st,0.8),shade(sd,0.8));
+  coneM(built,x,y+H+7.2,z,5.9,2.9,12,PAL.zinc[0],PAL.zinc[1]);
+  beam(built,[x+5.6,y-1.2,z],[x+5.6,y+H+1,z],0.24,shade(st,0.75),shade(sd,0.75));  // ladder rail
+  // two concrete tanks and a pump house
+  cylM(built,x+34,terrainH(x+34,z+22)-1,z+22,7.2,7.2,4.6,14,PAL.concrete[0],PAL.concrete[1]);
+  cylM(built,x+34,terrainH(x+34,z+22)+3.6,z+22,7.4,7.4,0.5,14,shade(PAL.concrete[0],0.82),shade(PAL.concrete[1],0.82));
+  cylM(built,x+56,terrainH(x+56,z+46)-1,z+46,6.4,6.4,4.2,14,PAL.concrete[0],PAL.concrete[1]);
+  cylM(built,x+56,terrainH(x+56,z+46)+3.2,z+46,6.6,6.6,0.5,14,shade(PAL.concrete[0],0.82),shade(PAL.concrete[1],0.82));
+  building({x:x+14,z:z+44,hw:4.2,hd:3.4,ang:0.2,wall:PAL.concrete[0],roof:PAL.zinc[0],windows:false});
+  setCoverDisc(x,z,26,0); setCoverDisc(x+40,z+30,24,0);
+}
+
+/* ---- energy: solar, silo, turbines --------------------------------------- */
+function solarArray(x,z,rows,cols,ang){
+  const ca=Math.cos(ang), sa=Math.sin(ang);
+  for(let r=0;r<rows;r++) for(let c=0;c<cols;c++){
+    const u=(c-(cols-1)/2)*9.5, v=(r-(rows-1)/2)*7.4;
+    const px=x+u*ca-v*sa, pz=z+u*sa+v*ca, py=terrainH(px,pz);
+    panelM(built,px,py+2.2,pz,8.6,5.6,-0.44,ang,PAL.solar[0],PAL.solar[1]);
+    for(const s of [-1,1]) beam(built,[px+s*3.4*ca,py-0.4,pz+s*3.4*sa],
+      [px+s*3.4*ca,py+1.9,pz+s*3.4*sa],0.30,PAL.steel[0],PAL.steel[1]);
+    setCoverDisc(px,pz,6,0);
+  }
+}
+const TURBINES=[];
+function turbine(x,z,s){
+  const y=terrainH(x,z), H=46*s;
+  cylM(built,x,y-1,z,2.3*s,1.1*s,H,10,PAL.white[0],PAL.white[1],false);
+  boxM(built,x,y+H+1.4*s,z,3.0*s,2.6*s,7.4*s,PAL.white[0],PAL.white[1],0.6);
+  TURBINES.push({x,y:y+H+1.4*s,z,s,yaw:0.6,ph:R(0,TAU),sp:R(0.5,0.75)});
+}
+
+/* ---- market: stalls under parasols --------------------------------------- */
+function parasol(x,z,r,col){
+  const y=terrainH(x,z), h=3.4;
+  beam(built,[x,y,z],[x,y+h+0.5,z],0.20,PAL.trunk,mixc(PAL.trunk,PAL.earth[1],0.3));
+  const SEG=10;
+  for(let i=0;i<SEG;i++){
+    const a0=i/SEG*TAU, a1=(i+1)/SEG*TAU;
+    const c=(i%2)?col:mixc(col,PAL.white[0],0.55);       // striped canopy
+    const cd=mixc(c,PAL.earth[1],0.18);
+    built.tri([x+Math.cos(a0)*r,y+h,z+Math.sin(a0)*r],[x+Math.cos(a1)*r,y+h,z+Math.sin(a1)*r],
+      [x,y+h+1.15,z],[Math.cos((a0+a1)/2)*0.5,0.86,Math.sin((a0+a1)/2)*0.5],c,cd);
+    built.tri([x+Math.cos(a1)*r,y+h,z+Math.sin(a1)*r],[x+Math.cos(a0)*r,y+h,z+Math.sin(a0)*r],
+      [x,y+h+1.15,z],[0,-1,0],shade(c,0.42),shade(cd,0.42));
+  }
+  // the table under it, and goods heaped on the table
+  boxM(built,x,y+1.5,z,r*1.25,0.28,r*1.0,PAL.trunk,mixc(PAL.trunk,PAL.earth[1],0.3),R(0,1));
+  for(let k=0,n=Ri(2,5);k<n;k++){
+    const c=pick(PARASOL);
+    boxM(built,x+R(-1,1)*r*0.45,y+1.85,z+R(-1,1)*r*0.35,R(0.6,1.1),R(0.4,0.8),R(0.5,0.9),
+      c,mixc(c,PAL.earth[1],0.2),R(0,1));
+  }
+}
+function market(cx,cz){
+  setCoverDisc(cx,cz,64,6);
+  building({x:cx+78,z:cz-30,hw:13,hd:7.5,ang:0.10,wall:hx('#4a7a55'),roof:PAL.zinc[0],
+            levels:1,hscale:1.25,veranda:4.5,trim:PAL.dark[0]});
+  const sy=terrainH(cx+78,cz-30);
+  boxM(built,cx+78,sy+4.6,cz-22.2,17,1.6,0.4,PAL.white[0],PAL.white[1],0.10);   // shop sign
+  building({x:cx-64,z:cz+26,hw:9,hd:6,ang:-0.22,wall:hx('#c9a06a'),roof:hx('#8a4a2c'),levels:1});
+  for(let r=0;r<6;r++) for(let c=0;c<9;c++){
+    if(rnd()<0.10) continue;
+    const x=cx-72+c*18+R(-3.5,3.5), z=cz-44+r*17+R(-3.5,3.5);
+    parasol(x,z,R(3.8,5.2),PARASOL[(r*9+c+Ri(0,2))%PARASOL.length]);
+  }
+  for(let k=0;k<26;k++){                                  // open ground stalls
+    const x=cx+R(-84,84), z=cz+R(-52,52);
+    if(rnd()<0.5) continue;
+    const c=pick(PARASOL);
+    boxM(built,x,terrainH(x,z)+0.9,z,R(2.2,3.6),0.5,R(1.6,2.6),c,mixc(c,PAL.earth[1],0.25),R(0,TAU));
+  }
+}
+
+/* ---- livestock and machines ---------------------------------------------- */
+function cow(x,z,ang,dark){
+  const y=terrainH(x,z), c=dark?hx('#6d4a30'):hx('#d8d2c2'), cd=mixc(c,PAL.earth[1],0.22);
+  boxM(built,x,y+1.55,z,1.05,1.05,2.5,c,cd,ang);
+  const ca=Math.cos(ang), sa=Math.sin(ang);
+  boxM(built,x+1.45*sa,y+1.62,z+1.45*ca,0.6,0.62,0.9,mixc(c,PAL.dark[0],0.3),cd,ang);
+  for(const u of [-0.42,0.42]) for(const v of [-0.85,0.85])
+    beam(built,[x+u*ca-v*sa,y,z+u*sa+v*ca],[x+u*ca-v*sa,y+1.15,z+u*sa+v*ca],0.24,
+      mixc(c,PAL.dark[0],0.2),cd);
+}
+function vehicleMesh(kind){
+  const m=new Mesh();
+  const dark=PAL.dark[0], darkD=PAL.dark[1], glass=hx('#22303e');
+  if(kind==='bus'){
+    const c=hx('#e8b02a'), cd=mixc(c,PAL.earth[1],0.2);
+    boxM(m,0,1.6,0,2.5,2.0,7.0,c,cd,0);
+    boxM(m,0,2.72,-0.2,2.42,0.9,6.2,glass,mixc(glass,PAL.earth[1],0.2),0);
+    boxM(m,0,3.25,0,2.5,0.4,7.0,shade(c,0.86),shade(cd,0.86),0);
+    for(const s of [-1,1]) for(const v of [-2.2,2.3])
+      cylM(m,s*1.25,0.2,v,0.62,0.62,0.36,8,dark,darkD);
+  } else if(kind==='pickup'){
+    const c=PAL.white[0], cd=PAL.white[1];
+    boxM(m,0,1.35,0.4,2.1,1.2,5.0,c,cd,0);
+    boxM(m,0,2.15,1.0,1.95,0.9,1.9,glass,mixc(glass,PAL.earth[1],0.2),0);
+    boxM(m,0,1.95,-1.3,2.05,0.4,2.4,shade(c,0.9),shade(cd,0.9),0);
+    for(const s of [-1,1]) for(const v of [-1.6,1.6]) cylM(m,s*1.02,0.15,v,0.55,0.55,0.32,8,dark,darkD);
+  } else if(kind==='truck'){
+    const c=hx('#3f6fa8'), cd=mixc(c,PAL.earth[1],0.2);
+    boxM(m,0,2.0,-1.0,2.6,2.6,5.2,hx('#b6ac97'),hx('#c4baa2'),0);
+    boxM(m,0,1.9,2.6,2.4,2.2,2.6,c,cd,0);
+    boxM(m,0,2.55,3.2,2.3,0.8,1.2,glass,mixc(glass,PAL.earth[1],0.2),0);
+    for(const s of [-1,1]) for(const v of [-2.2,0.4,2.4]) cylM(m,s*1.3,0.2,v,0.7,0.7,0.4,8,dark,darkD);
+  } else if(kind==='moto'){
+    const c=pick([hx('#b8402c'),hx('#2f4f86'),hx('#3f7a4a')]);
+    boxM(m,0,0.85,0,0.5,0.5,1.9,c,mixc(c,PAL.earth[1],0.2),0);
+    cylM(m,0,0.1,-0.85,0.42,0.42,0.2,8,dark,darkD);
+    cylM(m,0,0.1, 0.85,0.42,0.42,0.2,8,dark,darkD);
+    boxM(m,0,1.65,-0.1,0.55,1.1,0.5,hx('#6b4630'),hx('#7a5236'),0);
+  } else {                                                 // tractor
+    const c=hx('#2f7a35'), cd=mixc(c,PAL.earth[1],0.2);
+    boxM(m,0,1.5,0.2,1.9,1.5,3.4,c,cd,0);
+    boxM(m,0,2.75,-0.5,1.6,1.4,1.5,glass,mixc(glass,PAL.earth[1],0.2),0);
+    boxM(m,0,3.5,-0.5,1.8,0.25,1.7,shade(c,0.85),shade(cd,0.85),0);
+    for(const s of [-1,1]){ cylM(m,s*1.05,0.05,-1.0,1.05,1.05,0.5,10,dark,darkD);
+                            cylM(m,s*0.95,0.25,1.5,0.62,0.62,0.4,8,dark,darkD); }
+  }
+  return m;
+}
+
+/* ==========================================================================
+   7.  Lay out the settlement
+   ========================================================================== */
+// --- the school compound: a long block on a swept courtyard ---------------
+const SCH=D.school;
+setCoverDisc(SCH[0],SCH[1]+46,74,6);
+setCoverDisc(SCH[0],SCH[1],52,6);
+(function school(){
+  building({x:SCH[0],z:SCH[1],hw:38,hd:9.5,ang:0.04,levels:1,hscale:1.30,
+            wall:hx('#d9b45c'),roof:hx('#95482a'),hip:false,eave:1.6,veranda:5.0,
+            trim:hx('#2f5f96')});
+  building({x:SCH[0]-52,z:SCH[1]+34,hw:8,hd:16,ang:0.04,levels:1,hscale:1.15,
+            wall:hx('#d9b45c'),roof:hx('#95482a'),veranda:3.2});
+  building({x:SCH[0]+56,z:SCH[1]+30,hw:8,hd:14,ang:0.04,levels:1,hscale:1.15,
+            wall:hx('#ded1bb'),roof:hx('#95482a'),veranda:3.2});
+  building({x:SCH[0]-16,z:SCH[1]-34,hw:14,hd:6,ang:0.04,levels:1,
+            wall:hx('#ded1bb'),roof:PAL.zinc[0]});
+  const fy=terrainH(SCH[0]+30,SCH[1]+58);                 // flagpole
+  beam(built,[SCH[0]+30,fy,SCH[1]+58],[SCH[0]+30,fy+11,SCH[1]+58],0.26,PAL.steel[0],PAL.steel[1]);
+  boxM(built,SCH[0]+31.8,fy+9.9,SCH[1]+58,3.4,1.9,0.12,PAL.red[0],PAL.red[1],0.2);
+})();
+
+// --- the clinic ------------------------------------------------------------
+(function clinic(){
+  const [x,z]=D.health;
+  setCoverDisc(x,z,44,6);
+  const b=building({x:x,z:z,hw:19,hd:8.5,ang:-0.55,levels:1,hscale:1.2,
+    wall:PAL.white[0],roof:hx('#2f5a4e'),veranda:4.0,trim:PAL.green[0]});
+  const ca=Math.cos(-0.55), sa=Math.sin(-0.55);
+  const T=(u,v,y)=>[x+u*ca-v*sa, y, z+u*sa+v*ca];
+  const y=b.base+2.5, n=[-sa,0,ca];                        // green cross on the front wall
+  const arm=(w,h)=>built.quad(T(-w,8.62,y-h),T(w,8.62,y-h),T(w,8.62,y+h),T(-w,8.62,y+h),
+                              PAL.green[0],PAL.green[1],n);
+  arm(2.4,0.8); arm(0.8,2.4);
+  building({x:x-30,z:z+22,hw:9,hd:6,ang:-0.55,levels:1,wall:PAL.white[0],roof:hx('#2f5a4e')});
+  building({x:x+26,z:z+20,hw:7,hd:5,ang:-0.55,levels:1,wall:hx('#c9a06a'),roof:PAL.zinc[0]});
+})();
+
+// --- water and energy ------------------------------------------------------
+waterWorks(D.water[0],D.water[1]);
+(function energy(){
+  const [x,z]=D.energy;
+  setCoverDisc(x,z,70,0);
+  const b=building({x:x-40,z:z+14,hw:16,hd:10,ang:0.25,levels:1,hscale:1.2,
+                    wall:hx('#ded1bb'),roof:hx('#7a8794'),pitch:0.30});
+  for(let k=-2;k<=2;k++)                                   // rooftop array
+    panelM(built,x-40+k*5.6*Math.cos(0.25),b.top+2.4,z+14+k*5.6*Math.sin(0.25),
+           5.2,7.0,-0.30,0.25,PAL.solar[0],PAL.solar[1]);
+  solarArray(x+22,z+30,3,3,0.25);
+  solarArray(x+6,z-52,2,4,0.1);
+  cylM(built,x+50,terrainH(x+50,z-8)-1,z-8,7.0,7.0,13,14,PAL.steel[0],PAL.steel[1],false);
+  coneM(built,x+50,terrainH(x+50,z-8)+12,z-8,7.2,3.2,14,PAL.zinc[0],PAL.zinc[1]);
+  turbine(x+62,z+62,1.0);
+  turbine(x+40,z-116,0.78);
+})();
+
+// --- agriculture: the family's land, a tractor and the herd ---------------
+(function agriculture(){
+  const [x,z]=D.agri;
+  const F=[[x,z,86,54],[x+108,z-56,70,44],[x-96,z+52,64,42],[x+40,z+82,74,46],
+           [x-118,z-72,58,40],[x+150,z+46,60,40],[x-30,z-140,78,48],[x+180,z-130,66,42],
+           [x+130,z+150,70,46],[x-140,z+160,62,40],[x+250,z+60,56,38],[x-210,z+20,54,36]];
+  for(const f of F){ const [d,t]=dRiver(f[0],f[1]); if(d<riverWidth(t)+28) continue;
+    cropField(f[0],f[1],f[2],f[3],R(0,3.14)); }
+  building({x:x-40,z:z-104,hw:12,hd:8,ang:0.35,levels:1,hscale:1.3,
+            wall:hx('#a8794f'),roof:hx('#5b3f2a'),windows:false});     // the barn
+  for(let k=0;k<18;k++)                                                 // cattle on the pasture
+    cow(x-150+R(-70,70), z+120+R(-60,60), R(0,TAU), rnd()<0.34);
+  for(let k=0;k<7;k++) cow(x+R(-40,40), z-150+R(-30,30), R(0,TAU), rnd()<0.3);
+})();
+
+// --- market and the tarred road -------------------------------------------
+market(D.market[0],D.market[1]);
+const MAIN = road(spline([[-EXT-40,486],[-350,455],[-235,432],[-100,415],[20,405],
+  [BR.x,BR.z],[215,370],[300,318],[368,238],[420,140],[462,20],[EXT+40,-64]],7), 9.0,
+  {x:BR.x,z:BR.z,y:BR.y,span:44,ramp:70});
+const SPUR = road(spline([[368,238],[300,150],[236,44],[SCH[0]+72,SCH[1]+14],
+  [SCH[0]-30,SCH[1]-46],[-10,-160],[40,-300],[D.water[0]+20,-386]],7), 6.6);
+
+// --- dirt tracks -----------------------------------------------------------
+track(spline([[D.market[0],D.market[1]-70],[-190,190],[-120,60],[-40,-60],[-90,-190],[-230,-250]],6),
+      6.5, PAL.earth[0], PAL.earth[1]);
+track(spline([[SCH[0],SCH[1]+60],[110,150],[60,270],[30,400],[10,EXT+20]],6), 5.0, PAL.earth[0], PAL.earth[1]);
+track(spline([[D.health[0]-20,D.health[1]+18],[250,230],[170,300],[BR.x-30,BR.z-18]],6), 4.8, PAL.earth[0], PAL.earth[1]);
+track(spline([[D.market[0]-60,D.market[1]+40],[-330,420],[D.homes[0],D.homes[1]-20],[-460,EXT+20]],6),
+      5.2, PAL.earth[0], PAL.earth[1]);
+track(spline([[440,-190],[380,-280],[300,-340],[220,-430]],6), 4.2, PAL.earth[0], PAL.earth[1]);
+
+// --- dwellings -------------------------------------------------------------
+const VILLAGE=[];
+function compound(x,z){
+  if(Math.abs(x)>EXT-30||Math.abs(z)>EXT-30) return false;
+  const [d,t]=dRiver(x,z); if(d < riverWidth(t)+30) return false;
+  if(Math.hypot(x-SCH[0],z-SCH[1])<54) return false;
+  if(Math.hypot(x-D.health[0],z-D.health[1])<44) return false;
+  if(VILLAGE.some(p=>Math.hypot(p[0]-x,p[1]-z)<21)) return false;
+  VILLAGE.push([x,z]);
+  const hw=R(4.5,9), hd=R(4,7.5);
+  house(x,z,hw,hd, rnd()<0.88?1:2);
+  setCoverDisc(x,z,Math.max(hw,hd)+R(5,11),0);
+  if(rnd()<0.48) house(x+R(-1,1)*(hw+R(6,10)), z+R(-1,1)*(hd+R(5,9)), R(2.6,4.2), R(2.2,3.8), 1);
+  for(let k=0,n=Ri(1,4);k<n;k++){
+    const tx=x+R(-1,1)*R(12,26), tz=z+R(-1,1)*R(12,26);
+    if(Math.abs(tx-x)<hw+3&&Math.abs(tz-z)<hd+3) continue;
+    if(rnd()<0.30) addTree('palm',tx,tz,R(0.85,1.35));
+    else if(rnd()<0.34) addTree('plantain',tx,tz,R(0.8,1.25));
+    else addTree('broad',tx,tz,R(0.75,1.35));
+  }
+  return true;
+}
+function addTree(kind,x,z,s,extra){
+  trees[kind].push({x,z,y:terrainH(x,z),s,rot:R(0,6.28),v:extra===undefined?Ri(0,3):extra,tint:rnd()});
+}
+// swept clearings and worn laterite between the compounds — the reference
+// frame is as much bare red earth as it is green
+for(let k=0;k<80;k++){
+  const a=R(0,TAU), r=Math.pow(rnd(),0.6)*360;
+  const x=30+Math.cos(a)*r*1.15, z=130+Math.sin(a)*r;
+  const [d,t]=dRiver(x,z); if(d<riverWidth(t)+14) continue;
+  const ci=cover[Math.round((z+EXT)/GS)*(GN+1)+Math.round((x+EXT)/GS)];
+  if(ci===4||ci===5) continue;
+  setCoverDisc(x,z,R(5,15), rnd()<0.3?6:0);
+}
+// the dense core between school, market and the water
+for(let i=0;i<150;i++){
+  const ang=R(0,TAU), rad=Math.pow(rnd(),0.55)*300;
+  compound(SCH[0]-60+Math.cos(ang)*rad*R(0.9,1.5), SCH[1]+90+Math.sin(ang)*rad);
+}
+// the quarter by the road, bottom-left of the frame
+for(let i=0;i<52;i++){
+  const ang=R(0,TAU), rad=Math.pow(rnd(),0.6)*120;
+  compound(D.homes[0]+Math.cos(ang)*rad*1.5, D.homes[1]+Math.sin(ang)*rad*0.8);
+}
+// a few holdings out among the fields
+for(let i=0;i<26;i++) compound(R(-EXT+60,EXT-60), R(-EXT+60,EXT-60));
+
+bridge();
+
+// --- riparian forest, the eastern block, groves and yard trees ------------
+for(let i=0;i<34000;i++){
+  const x=R(-EXT,EXT), z=R(-EXT,EXT);
+  const [d,t]=dRiver(x,z), hw=riverWidth(t);
+  if(d<hw+2) continue;                                  // in the water
+  const ci=cover[Math.round((z+EXT)/GS)*(GN+1)+Math.round((x+EXT)/GS)];
+  if(ci===0||ci===4||ci===6) continue;                  // bare ground, fields, courtyard
+  if(VILLAGE.some(p=>Math.hypot(p[0]-x,p[1]-z)<20)) continue;
+  const riparian = d < hw+40;
+  let pr;
+  if(ci===1) pr=0.54; else if(ci===2) pr=0.15; else pr=0.035;
+  if(riparian) pr=Math.max(pr,0.46);
+  // the closer to the settled core, the more the canopy opens out
+  pr *= 0.58+0.42*Math.min(1,Math.hypot((x-30)*0.86,(z-130)*1.05)/330);
+  if(rnd()>pr) continue;
+  const r=rnd();
+  if(riparian && r<0.32) addTree('palm',x,z,R(1.0,1.7));
+  else if(r<0.09) addTree('plantain',x,z,R(0.8,1.3));
+  else if(r<0.22) addTree('palm',x,z,R(0.9,1.5));
+  else addTree('broad',x,z, ci===1?R(1.15,2.3):R(0.85,1.5));
+}
+for(let g=0;g<34;g++){                                   // plantain groves by the compounds
+  const c=VILLAGE.length?pick(VILLAGE):SCH;
+  const gx=c[0]+R(-1,1)*R(20,55), gz=c[1]+R(-1,1)*R(20,55);
+  for(let k=0,n=Ri(8,22);k<n;k++){
+    const x=gx+R(-1,1)*14, z=gz+R(-1,1)*14;
+    const [d,t]=dRiver(x,z); if(d<riverWidth(t)+6) continue;
+    addTree('plantain',x,z,R(0.85,1.3));
+  }
+}
+for(let k=0;k<30;k++){                                   // shade trees along the tarred road
+  const s=R(20,MAIN.L-20), p=MAIN.at(s), o=(rnd()<0.5?1:-1)*R(11,17);
+  addTree('broad', p.x-p.dz*o, p.z+p.dx*o, R(1.1,1.7));
+}
+// the bush carries on past the survey, thinning into the haze
+for(let i=0;i<17000;i++){
+  const x=R(-1140,1140), z=R(-1140,1140);
+  if(Math.abs(x)<EXT+6 && Math.abs(z)<EXT+6) continue;
+  const [d,t]=dRiver(x,z); if(d<riverWidth(t)+3) continue;
+  const n=fbm(x/230,z/230)+0.35*fbm(x/70+3,z/70+8);
+  const pr = n>0.02?0.36 : (n>-0.34?0.11:0.02);
+  if(rnd()>pr) continue;
+  addTree(rnd()<0.14?'palm':'broad', x, z, R(1.2,2.4));
+}
+stats.tree = trees.broad.length+trees.palm.length+trees.plantain.length;
+
+/* ---- people --------------------------------------------------------------
+   Each person shuttles between two points, so the movement traces real
+   routes: the school path, the field rows, the walk down to the water.     */
+const PEOPLE=[];
+const CLOTH=[hx('#c9522e'),hx('#2f4f86'),hx('#e0d5be'),hx('#d8a021'),
+             hx('#3f7a4a'),hx('#8e3f6d'),hx('#c47a2c'),hx('#6a6f78')];
+function person(ax,az,bx,bz,type,scale){
+  if(Math.abs(ax)>EXT||Math.abs(az)>EXT||Math.abs(bx)>EXT||Math.abs(bz)>EXT) return;
+  for(const [x,z] of [[ax,az],[bx,bz],[(ax+bx)/2,(az+bz)/2]]){
+    const [d,t]=dRiver(x,z);
+    if(d < riverWidth(t)+1.5) return;
+  }
+  PEOPLE.push({ax,ay:terrainH(ax,az),az, bx,by:terrainH(bx,bz),bz,
+    ph:R(0,20), sp:R(0.055,0.13)*(type===3?1.7:1), type,
+    s:scale*R(0.93,1.07), cloth:pick(CLOTH)});
+}
+for(const poly of PATHS){                                // walkers on the dirt tracks
+  const n=Math.max(2,Math.round(poly.length*0.30));
+  for(let k=0;k<n;k++){
+    const i=Ri(0,poly.length-2), j=Math.min(poly.length-1,i+Ri(2,6));
+    const a=poly[i], b=poly[j], off=R(-2.2,2.2);
+    person(a[0]+off,a[1]+off,b[0]+off,b[1]+off,0,rnd()<0.22?1.15:1.72);
+  }
+}
+for(let k=0;k<70;k++){                                   // pedestrians on the road verge
+  const s=R(10,MAIN.L-40), p=MAIN.at(s), q=MAIN.at(s+R(14,40));
+  const o=(rnd()<0.5?1:-1)*R(6.6,9.5);
+  person(p.x-p.dz*o,p.z+p.dx*o, q.x-q.dz*o,q.z+q.dx*o, 0, rnd()<0.25?1.15:1.72);
+}
+for(const [cx,cz,hw,hd,ang] of FIELDSOK){                // farmers working the rows
+  const ca=Math.cos(ang), sa=Math.sin(ang);
+  for(let k=0,n=Ri(3,8);k<n;k++){
+    const u=R(-hw*0.85,hw*0.85), v0=R(-hd*0.85,hd*0.4), v1=v0+R(8,26);
+    person(cx+u*ca-v0*sa, cz+u*sa+v0*ca, cx+u*ca-v1*sa, cz+u*sa+v1*ca, 1, 1.70);
+  }
+}
+for(let k=0;k<52;k++){                                   // water carriers
+  const i=Ri(4,RIVER.length-5), t=i/(RIVER.length-1);
+  const a=RIVER[i], b=RIVER[Math.min(RIVER.length-1,i+1)];
+  const dx=b[0]-a[0], dz=b[1]-a[1], L=Math.hypot(dx,dz)||1;
+  const side=rnd()<0.5?1:-1, w=riverWidth(t)+R(3,9);
+  const rx=a[0]-dz/L*w*side, rz=a[1]+dx/L*w*side;
+  const home=VILLAGE.length?pick(VILLAGE):SCH;
+  if(Math.hypot(home[0]-rx,home[1]-rz)>300) continue;
+  const f=R(0.35,0.85);
+  person(rx,rz, rx+(home[0]-rx)*f, rz+(home[1]-rz)*f, 2, rnd()<0.3?1.20:1.70);
+}
+for(let k=0;k<120;k++){                                  // the school yard
+  const a0=R(0,TAU), a1=a0+R(0.6,3.4), r0=R(8,54), r1=R(8,54);
+  person(SCH[0]+Math.cos(a0)*r0, SCH[1]+34+Math.sin(a0)*r0,
+         SCH[0]+Math.cos(a1)*r1, SCH[1]+34+Math.sin(a1)*r1, 3, R(1.05,1.35));
+}
+for(let k=0;k<130;k++){                                  // the market crowd
+  const a0=R(0,TAU), a1=a0+R(0.4,2.6), r0=R(10,86), r1=R(10,86);
+  person(D.market[0]+Math.cos(a0)*r0*1.1, D.market[1]+Math.sin(a0)*r0*0.7,
+         D.market[0]+Math.cos(a1)*r1*1.1, D.market[1]+Math.sin(a1)*r1*0.7,
+         2, rnd()<0.3?1.20:1.70);
+}
+for(const c of VILLAGE){                                 // people about the compounds
+  for(let k=0,n=Ri(0,3);k<n;k++){
+    const a0=R(0,TAU), r0=R(7,22);
+    const ax=c[0]+Math.cos(a0)*r0, az=c[1]+Math.sin(a0)*r0;
+    person(ax,az, ax+R(-9,9), az+R(-9,9), rnd()<0.5?2:0, rnd()<0.25?1.15:1.70);
+  }
+}
+stats.people=PEOPLE.length;
+
+/* ---- traffic -------------------------------------------------------------- */
+function linePath(a,b){
+  const dx=b[0]-a[0], dz=b[1]-a[1], L=Math.hypot(dx,dz)||1;
+  return {L, at(s){ const t=Math.max(0,Math.min(1,s/this.L));
+    const x=a[0]+dx*t, z=a[1]+dz*t;
+    return {x,z,y:terrainH(x,z)+0.1,dx:dx/L,dz:dz/L}; }};
+}
+const TRAFFIC=[
+  {k:'bus',    path:MAIN, s:MAIN.L*0.30, sp:13, dir: 1, off: 2.4},
+  {k:'pickup', path:MAIN, s:MAIN.L*0.62, sp:16, dir:-1, off:-2.4},
+  {k:'truck',  path:MAIN, s:MAIN.L*0.08, sp:10, dir: 1, off: 2.4},
+  {k:'moto',   path:MAIN, s:MAIN.L*0.48, sp:18, dir:-1, off:-3.2},
+  {k:'moto',   path:MAIN, s:MAIN.L*0.80, sp:15, dir: 1, off: 3.2},
+  {k:'pickup', path:SPUR, s:SPUR.L*0.40, sp:12, dir: 1, off: 1.8},
+  {k:'moto',   path:SPUR, s:SPUR.L*0.72, sp:14, dir:-1, off:-2.0},
+  {k:'tractor',path:linePath([D.agri[0]-70,D.agri[1]+30],[D.agri[0]+60,D.agri[1]-20]), s:20, sp:3.2, dir:1, off:0},
+];
+
+/* ---- terrain mesh (after cover is final) --------------------------------- */
+(function ground(){
+  const L=[PAL.earth[0],PAL.forest[0],PAL.bush[0],PAL.grass[0],PAL.soil[0],PAL.crop[0],PAL.swept[0]];
+  const Dk=[PAL.earth[1],PAL.forest[1],PAL.bush[1],PAL.grass[1],PAL.soil[1],PAL.crop[1],PAL.swept[1]];
+  // one colour per grid vertex, blended across the quad
+  const VL=[], VD=[];
+  for(let j=0;j<=GN;j++)for(let i=0;i<=GN;i++){
+    const k=cover[j*(GN+1)+i], x=-EXT+i*GS, z=-EXT+j*GS;
+    const f=0.90+0.17*fbm(x/34,z/34)+0.07*fbm(x/12+31,z/12+17);
+    VL.push(shade(L[k],f)); VD.push(shade(Dk[k],f));
+  }
+  const vi=(i,j)=>j*(GN+1)+i;
+  for(let j=0;j<GN;j++)for(let i=0;i<GN;i++){
+    const x0=-EXT+i*GS,z0=-EXT+j*GS,x1=x0+GS,z1=z0+GS;
+    const y00=terrainH(x0,z0),y10=terrainH(x1,z0),y11=terrainH(x1,z1),y01=terrainH(x0,z1);
+    const q=[vi(i,j),vi(i+1,j),vi(i+1,j+1),vi(i,j+1)];
+    const dhx=(y10-y00)/GS, dhz=(y01-y00)/GS, nl=Math.hypot(-dhx,1,-dhz);
+    world.quadV([x0,y00,z0],[x1,y10,z0],[x1,y11,z1],[x0,y01,z1],
+      q.map(k=>VL[k]), q.map(k=>VD[k]), [-dhx/nl,1/nl,-dhz/nl]);
+  }
+  // the country carries on past the survey on a coarse grid, so the world has
+  // no visible edge — the valley simply runs away into the haze
+  const CS=26, OUT=EXT+CS*24;
+  const cl=(n,A)=>{ const a=Math.min(1,Math.max(0,(n+0.34)/0.30)), b=Math.min(1,Math.max(0,(n-0.02)/0.30));
+    return mixc(mixc(A[3],A[2],a),A[1],b); };
+  for(let z0=-OUT; z0<OUT; z0+=CS) for(let x0=-OUT; x0<OUT; x0+=CS){
+    if(x0>=-EXT && x0<EXT && z0>=-EXT && z0<EXT) continue;
+    const x1=x0+CS, z1=z0+CS;
+    const y00=terrainH(x0,z0),y10=terrainH(x1,z0),y11=terrainH(x1,z1),y01=terrainH(x0,z1);
+    const n=fbm(x0/230,z0/230)+0.35*fbm(x0/70+3,z0/70+8);
+    const g=0.90+0.11*fbm(x0/130+5,z0/130+9)+0.05*fbm(x0/26+2,z0/26+6);
+    const dhx=(y10-y00)/CS, dhz=(y01-y00)/CS, nl=Math.hypot(-dhx,1,-dhz);
+    world.quad([x0,y00,z0],[x1,y10,z0],[x1,y11,z1],[x0,y01,z1],
+      shade(cl(n,L),g),shade(cl(n,Dk),g),[-dhx/nl,1/nl,-dhz/nl]);
+  }
+})();
+
+/* ==========================================================================
+   8.  WebGL
+   ========================================================================== */
+const cv=document.getElementById('c');
+const gl=cv.getContext('webgl2',{antialias:true,powerPreference:'high-performance'});
+if(!gl){document.getElementById('err').style.display='grid';document.getElementById('panel').style.display='none';
+  document.getElementById('pins').style.display='none';return;}
+
+function sh(t,s){const o=gl.createShader(t);gl.shaderSource(o,s);gl.compileShader(o);
+  if(!gl.getShaderParameter(o,gl.COMPILE_STATUS))throw new Error(gl.getShaderInfoLog(o));return o;}
+function prog(v,f){const p=gl.createProgram();
+  gl.attachShader(p,sh(gl.VERTEX_SHADER,v));gl.attachShader(p,sh(gl.FRAGMENT_SHADER,f));gl.linkProgram(p);
+  if(!gl.getProgramParameter(p,gl.LINK_STATUS))throw new Error(gl.getProgramInfoLog(p));return p;}
+function buf(d,size,loc,div){ if(loc<0)return null;
+  const b=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,b);gl.bufferData(gl.ARRAY_BUFFER,d,gl.STATIC_DRAW);
+  gl.enableVertexAttribArray(loc);gl.vertexAttribPointer(loc,size,gl.FLOAT,false,0,0);
+  if(div)gl.vertexAttribDivisor(loc,div);return b;}
+
+const COMMON=`
+const vec3 SUN    = vec3(-0.4604, 0.4404, 0.7707);   // ~26 deg, warm afternoon
+const vec3 SUNCOL = vec3(1.36, 1.17, 0.88);
+uniform float uSunI;                                  // 0 = overcast, 1 = harsh noon
+uniform float uRain;                                  // 0 = dry, 1 = downpour
+
+vec3 aces(vec3 x){ return clamp((x*(2.51*x+0.03))/(x*(2.43*x+0.59)+0.14), 0.0, 1.0); }
+
+vec3 grade(vec3 c, float season){
+  c *= vec3(1.06, 1.00, 0.93);                          // warm afternoon cast
+  c = aces(c*mix(0.66,1.46,uSunI));
+  float g = dot(c, vec3(0.299,0.587,0.114));
+  return mix(vec3(g), c, mix(1.12, 0.92, season)*(1.0-uRain*0.22));
+}
+
+vec3 lightIt(vec3 c, vec3 N, vec3 W, vec3 cam, float season){
+  vec3 n = normalize(N);
+  vec3 V = normalize(cam - W);
+  float d    = max(0.0, dot(n, SUN));
+  float wrap = max(0.0, (dot(n,SUN)+0.42)/1.42);       // soft foliage wrap
+  float sky  = 0.5 + 0.5*n.y;
+  vec3 amb = mix(vec3(0.30,0.41,0.38), vec3(0.46,0.45,0.35), season)*sky;
+  vec3 bnc = mix(vec3(0.18,0.13,0.07), vec3(0.24,0.19,0.10), season)*(1.0-sky);
+  vec3 sun = mix(SUNCOL, vec3(1.40,1.12,0.72), season);
+  amb = mix(amb, vec3(0.40,0.45,0.50)*sky*1.25, uRain);      // flat overcast light
+  vec3 col = c*(amb*mix(1.18,0.92,uSunI) + bnc*(1.0-uRain*0.7)
+             + sun*(d*0.80 + wrap*0.30)*mix(0.34,1.28,uSunI)*(1.0-uRain*0.76));
+  col *= 1.0 - uRain*0.13;                                   // wet ground darkens
+  float sp = pow(max(0.0, dot(reflect(-SUN,n), V)), 22.0);
+  col += sp*(0.09+uRain*0.30)*sun*mix(0.20,1.3,uSunI);   // wet sheen
+  float fr = pow(1.0 - abs(dot(n,V)), 3.0);
+  col += fr*mix(vec3(0.13,0.17,0.16), vec3(0.20,0.17,0.11), season)*0.85;
+  return col;
+}
+
+vec3 applyFog(vec3 col, vec3 W, vec3 cam, float season){
+  vec3 V = normalize(W - cam);
+  float dist = length(W - cam);
+  vec3 f = mix(vec3(0.74,0.79,0.71), vec3(0.86,0.80,0.61), season);
+  f = mix(f, mix(vec3(1.00,0.88,0.66), vec3(1.00,0.86,0.58), season),
+          pow(max(0.0, dot(V,SUN)), 4.0)*0.55);        // haze glows toward the sun
+  f = mix(f, vec3(0.62,0.66,0.68), uRain);             // rain greys the distance
+  float near = mix(560.0, 190.0, uRain), far = mix(2700.0, 1250.0, uRain);
+  float k = clamp((dist-near)/(far-near), 0.0, 1.0);
+  return mix(col, f, k*k*0.96);
+}`;
+
+const mainP=prog(`#version 300 es
+in vec3 aPos;in vec3 aNormal;in vec3 aColA;in vec3 aColB;
+uniform mat4 uVP;uniform float uSeason;
+out vec3 vN;out vec3 vW;out vec3 vC;
+void main(){vN=aNormal;vW=aPos;vC=mix(aColA,aColB,uSeason);gl_Position=uVP*vec4(aPos,1.0);}`,
+`#version 300 es
+precision highp float;
+in vec3 vN;in vec3 vW;in vec3 vC;uniform vec3 uCam;uniform float uSeason;out vec4 o;
+${COMMON}
+void main(){
+  vec3 col=lightIt(vC,vN,vW,uCam,uSeason);
+  o=vec4(grade(applyFog(col,vW,uCam,uSeason),uSeason),1.0);
+}`);
+
+const treeP=prog(`#version 300 es
+in vec3 aPos;in vec3 aNormal;in vec3 aColA;in vec3 aColB;in float aSway;
+in vec3 iPos;in float iScale;in float iRot;in float iVar;in float iTint;
+uniform mat4 uVP;uniform float uSeason;uniform float uTime;uniform float uWind;
+uniform float uShrink;uniform float uDroop;
+out vec3 vN;out vec3 vW;out vec3 vC;
+void main(){
+  vec3 p=aPos;
+  float lf=step(0.001,aSway);
+  p.xz*=mix(1.0,uShrink,uSeason*lf);
+  p.y-=uDroop*uSeason*lf*aSway*1.6;
+  float ph=iPos.x*0.08+iPos.z*0.06+iVar;
+  float sw=uWind*0.9*sin(uTime*1.25+ph)*aSway*aSway*mix(1.0,0.5,uSeason);
+  p.x+=sw; p.z+=sw*0.5;
+  float s=sin(iRot),c=cos(iRot);
+  vec3 r=vec3(p.x*c-p.z*s,p.y,p.x*s+p.z*c)*iScale;
+  vN=vec3(aNormal.x*c-aNormal.z*s,aNormal.y,aNormal.x*s+aNormal.z*c);
+  vW=r+iPos;
+  vec3 base=mix(aColA,aColB,uSeason);
+  base*=0.70+0.40*iTint;                       // per-tree brightness
+  base.g*=0.94+0.12*fract(iTint*7.31);         // and a little hue drift
+  base.r*=0.96+0.10*fract(iTint*3.17);
+  vC=base;
+  gl_Position=uVP*vec4(vW,1.0);
+}`,
+`#version 300 es
+precision highp float;
+in vec3 vN;in vec3 vW;in vec3 vC;uniform vec3 uCam;uniform float uSeason;out vec4 o;
+${COMMON}
+void main(){ o=vec4(grade(applyFog(lightIt(vC,vN,vW,uCam,uSeason),vW,uCam,uSeason),uSeason),1.0); }`);
+
+/* rigid props placed by uniform — vehicles, turbine blades */
+const propP=prog(`#version 300 es
+in vec3 aPos;in vec3 aNormal;in vec3 aColA;in vec3 aColB;
+uniform mat4 uVP;uniform float uSeason,uScale,uSpin;uniform vec3 uPos;uniform vec2 uDir;
+out vec3 vN;out vec3 vW;out vec3 vC;
+void main(){
+  float cs=cos(uSpin), sn=sin(uSpin);
+  vec3 p=vec3(aPos.x*cs-aPos.y*sn, aPos.x*sn+aPos.y*cs, aPos.z)*uScale;
+  vec3 n=vec3(aNormal.x*cs-aNormal.y*sn, aNormal.x*sn+aNormal.y*cs, aNormal.z);
+  vW=uPos+vec3(p.x*uDir.y+p.z*uDir.x, p.y, -p.x*uDir.x+p.z*uDir.y);
+  vN=vec3(n.x*uDir.y+n.z*uDir.x, n.y, -n.x*uDir.x+n.z*uDir.y);
+  vC=mix(aColA,aColB,uSeason);
+  gl_Position=uVP*vec4(vW,1.0);
+}`,
+`#version 300 es
+precision highp float;
+in vec3 vN;in vec3 vW;in vec3 vC;uniform vec3 uCam;uniform float uSeason;out vec4 o;
+${COMMON}
+void main(){ o=vec4(grade(applyFog(lightIt(vC,vN,vW,uCam,uSeason),vW,uCam,uSeason),uSeason),1.0); }`);
+
+const waterP=prog(`#version 300 es
+in vec3 aPos;in float aEdge;uniform mat4 uVP;out vec3 vW;out float vE;
+void main(){vW=aPos;vE=aEdge;gl_Position=uVP*vec4(aPos,1.0);}`,
+`#version 300 es
+precision highp float;
+in vec3 vW;in float vE;uniform vec3 uCam;uniform float uTime;uniform float uSeason;out vec4 o;
+${COMMON}
+void main(){
+  float shrink=1.0-uSeason*0.74;
+  float a=smoothstep(shrink,shrink-0.22,vE);
+  if(a<0.02) discard;
+  vec2 q=vW.xz;
+  float w1=sin(q.x*0.11+uTime*0.85)*cos(q.y*0.09-uTime*0.62);
+  float w2=sin(q.x*0.27-uTime*1.3+q.y*0.17);
+  float r1=sin(q.x*2.7+uTime*9.0)*cos(q.y*2.3-uTime*7.5);
+  float r2=sin((q.x+q.y)*3.9-uTime*11.0);
+  vec3 N=normalize(vec3(w1*0.28+w2*0.13 + r1*0.34*uRain, 1.0,
+                        w2*0.24-w1*0.10 + r2*0.34*uRain));
+  vec3 base=mix(vec3(0.145,0.250,0.322),vec3(0.400,0.418,0.322),uSeason);
+  vec3 V=normalize(uCam-vW);
+  float fr=pow(1.0-abs(dot(N,V)),3.0);
+  vec3 sky=mix(vec3(0.60,0.72,0.78),vec3(0.80,0.75,0.58),uSeason);
+  float sp=pow(max(0.0,dot(reflect(-SUN,N),V)),56.0);
+  vec3 col=mix(base,sky,fr*0.48)+sp*1.4*(1.0-uSeason*0.6);
+  col+=vec3(1.0,0.90,0.70)*pow(max(0.0,dot(reflect(-V,N),SUN)),140.0)*0.9*mix(0.15,1.3,uSunI);
+  o=vec4(grade(applyFog(col,vW,uCam,uSeason),uSeason),a*0.94);
+}`);
+
+const skyP=prog(`#version 300 es
+const vec2 V[3]=vec2[3](vec2(-1.,-1.),vec2(3.,-1.),vec2(-1.,3.));
+out vec2 vUv;void main(){vec2 p=V[gl_VertexID];vUv=p*0.5+0.5;gl_Position=vec4(p,0.999,1.0);}`,
+`#version 300 es
+precision highp float;
+in vec2 vUv;
+uniform float uSeason,uTanHalf,uAspect,uTime;
+uniform vec3 uRight,uUp,uFwd;
+out vec4 o;
+${COMMON}
+float h21(vec2 p){p=fract(p*vec2(123.34,345.45));p+=dot(p,p+34.345);return fract(p.x*p.y);}
+float vn2(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.0-2.0*f);
+  return mix(mix(h21(i),h21(i+vec2(1,0)),f.x),mix(h21(i+vec2(0,1)),h21(i+vec2(1,1)),f.x),f.y);}
+float cloudf(vec2 p){return vn2(p)*0.55+vn2(p*2.3+11.0)*0.28+vn2(p*4.9+3.0)*0.17;}
+void main(){
+  vec3 dir=normalize(uFwd + uRight*((vUv.x*2.0-1.0)*uTanHalf*uAspect)
+                          + uUp   *((vUv.y*2.0-1.0)*uTanHalf));
+  float h=clamp(dir.y*0.5+0.5,0.0,1.0);
+  float c=max(0.0,dot(dir,SUN));
+  vec3 hor=mix(vec3(0.80,0.83,0.72),vec3(0.91,0.84,0.63),uSeason);
+  vec3 zen=mix(vec3(0.28,0.51,0.75),vec3(0.60,0.65,0.60),uSeason);
+  hor=mix(hor,vec3(0.60,0.63,0.65),uRain); zen=mix(zen,vec3(0.44,0.48,0.52),uRain);
+  vec3 col=mix(hor,zen,pow(h,0.72));
+  float si=mix(0.12,1.35,uSunI)*(1.0-uRain*0.94);
+  if(dir.y>0.012){                                                 // drifting cloud deck
+    vec2 uv=dir.xz/dir.y*0.0055+vec2(uTime*0.0035,0.0);
+    float f=cloudf(uv*2.4);
+    float cl=smoothstep(0.54,0.86,f)*smoothstep(0.012,0.19,dir.y);
+    cl*=mix(0.55,1.0,uRain)*mix(1.0,0.72,uSeason);
+    vec3 cc=mix(vec3(1.00,0.98,0.94),vec3(0.66,0.68,0.70),uRain*0.8);
+    cc=mix(cc,vec3(1.0,0.93,0.80),pow(c,3.0)*0.5);
+    col=mix(col,cc,cl*0.92);
+  }
+  col+=vec3(1.00,0.86,0.60)*pow(c,9.0)*0.42*si;                    // broad halo
+  col+=vec3(1.00,0.90,0.70)*pow(c,320.0)*1.5*si;                   // bloom core
+  col+=vec3(1.00,0.95,0.82)*smoothstep(0.99955,0.99988,c)*2.6*si;  // disc
+  o=vec4(grade(col,uSeason),1.0);
+}`);
+
+function meshVAO(m,p){const vao=gl.createVertexArray();gl.bindVertexArray(vao);
+  buf(new Float32Array(m.p),3,gl.getAttribLocation(p,'aPos'));
+  buf(new Float32Array(m.n),3,gl.getAttribLocation(p,'aNormal'));
+  buf(new Float32Array(m.a),3,gl.getAttribLocation(p,'aColA'));
+  buf(new Float32Array(m.b),3,gl.getAttribLocation(p,'aColB'));
+  gl.bindVertexArray(null);return{vao,n:m.count()};}
+const gWorld=meshVAO(world,mainP), gBuilt=meshVAO(built,mainP), gCrops=meshVAO(crops,mainP);
+
+const gWater=(function(){const vao=gl.createVertexArray();gl.bindVertexArray(vao);
+  buf(new Float32Array(water.p),3,gl.getAttribLocation(waterP,'aPos'));
+  buf(new Float32Array(water.e),1,gl.getAttribLocation(waterP,'aEdge'));
+  gl.bindVertexArray(null);return{vao,n:water.p.length/3};})();
+
+/* ---- vehicles and rotors, drawn one uniform at a time -------------------- */
+const VMESH={};
+for(const k of ['bus','pickup','truck','moto','tractor']) VMESH[k]=meshVAO(vehicleMesh(k),propP);
+const gBlades=(function(){
+  const m=new Mesh(), w=PAL.white[0], wd=PAL.white[1];
+  for(let b=0;b<3;b++){                                  // three blades in the XY plane
+    const a=b/3*TAU, ca=Math.cos(a), sa=Math.sin(a);
+    const P=(d,o,z)=>[ca*d-sa*o, sa*d+ca*o, z];
+    const seg=[[1.6,1.05],[9,1.25],[18,0.95],[25,0.55],[29,0.14]];
+    for(let k=0;k<seg.length-1;k++){
+      const [d0,w0]=seg[k], [d1,w1]=seg[k+1];
+      m.quad(P(d0,-w0,0.22),P(d1,-w1,0.22),P(d1,w1,0.22),P(d0,w0,0.22),w,wd,[0,0,1]);
+      m.quad(P(d0,w0,-0.22),P(d1,w1,-0.22),P(d1,-w1,-0.22),P(d0,-w0,-0.22),
+             shade(w,0.80),shade(wd,0.80),[0,0,-1]);
+    }
+  }
+  const hub=new Mesh();
+  coneM(hub,0,0,0,1.5,2.4,10,PAL.white[0],PAL.white[1]);
+  for(let i=0;i<hub.p.length;i+=3){                       // stand the hub cone on +z
+    const y=hub.p[i+1], z=hub.p[i+2]; hub.p[i+1]=z; hub.p[i+2]=y;
+    const ny=hub.n[i+1], nz=hub.n[i+2]; hub.n[i+1]=nz; hub.n[i+2]=ny;
+  }
+  m.p=m.p.concat(hub.p); m.n=m.n.concat(hub.n); m.a=m.a.concat(hub.a); m.b=m.b.concat(hub.b);
+  return meshVAO(m,propP);
+})();
+
+/* ---- three tree species -------------------------------------------------- */
+function speciesVAO(buildFn,list,shrink,droop){
+  const m=new Mesh(), sway=[];
+  const base=Mesh.prototype.tri.bind(m); let cs=0;
+  m.tri=function(a,b,c,n,x,y){base(a,b,c,n,x,y);sway.push(cs,cs,cs);};
+  buildFn(m,s=>{cs=s;});
+  const vao=gl.createVertexArray();gl.bindVertexArray(vao);
+  buf(new Float32Array(m.p),3,gl.getAttribLocation(treeP,'aPos'));
+  buf(new Float32Array(m.n),3,gl.getAttribLocation(treeP,'aNormal'));
+  buf(new Float32Array(m.a),3,gl.getAttribLocation(treeP,'aColA'));
+  buf(new Float32Array(m.b),3,gl.getAttribLocation(treeP,'aColB'));
+  buf(new Float32Array(sway),1,gl.getAttribLocation(treeP,'aSway'));
+  const N=list.length, iP=new Float32Array(N*3),iS=new Float32Array(N),iR=new Float32Array(N),
+        iV=new Float32Array(N), iT=new Float32Array(N);
+  for(let i=0;i<N;i++){const t=list[i];iP[i*3]=t.x;iP[i*3+1]=t.y;iP[i*3+2]=t.z;
+    iS[i]=t.s;iR[i]=t.rot;iV[i]=t.v*1.7;iT[i]=t.tint;}
+  buf(iP,3,gl.getAttribLocation(treeP,'iPos'),1);
+  buf(iS,1,gl.getAttribLocation(treeP,'iScale'),1);
+  buf(iR,1,gl.getAttribLocation(treeP,'iRot'),1);
+  buf(iV,1,gl.getAttribLocation(treeP,'iVar'),1);
+  buf(iT,1,gl.getAttribLocation(treeP,'iTint'),1);
+  gl.bindVertexArray(null);
+  return {vao,n:m.count(),inst:N,shrink,droop};
+}
+function trunkOf(m,setSway,r,h,taper,col,colD){
+  setSway(0);
+  for(let i=0;i<4;i++){const a0=i/4*TAU,a1=(i+1)/4*TAU;
+    const A=[Math.cos(a0)*r,0,Math.sin(a0)*r],B=[Math.cos(a1)*r,0,Math.sin(a1)*r];
+    m.quad([A[0],0,A[2]],[B[0],0,B[2]],[B[0]*taper,h,B[2]*taper],[A[0]*taper,h,A[2]*taper],col,colD);}
+}
+const broadGeo=(m,S)=>{
+  trunkOf(m,S,0.32,2.8,0.72,PAL.trunk,mixc(PAL.trunk,PAL.earth[1],0.22));
+  const rings=[[2.2,1.9],[3.4,3.15],[4.6,2.5]], apex=6.0, SEG=7;
+  const cA=PAL.canopyL[1], cB=PAL.canopyD[1];
+  for(let r=0;r<rings.length-1;r++)for(let i=0;i<SEG;i++){
+    const a0=i/SEG*TAU,a1=(i+1)/SEG*TAU,[y0,r0]=rings[r],[y1,r1]=rings[r+1];
+    const sh2=0.84+0.22*(r/rings.length); S(Math.min(1,(y0-2.3)/3.4));
+    m.quad([Math.cos(a0)*r0,y0,Math.sin(a0)*r0],[Math.cos(a1)*r0,y0,Math.sin(a1)*r0],
+           [Math.cos(a1)*r1,y1,Math.sin(a1)*r1],[Math.cos(a0)*r1,y1,Math.sin(a0)*r1],
+           shade(cA,sh2),shade(cB,sh2));}
+  const [ly,lr]=rings[2]; S(1);
+  for(let i=0;i<SEG;i++){const a0=i/SEG*TAU,a1=(i+1)/SEG*TAU;
+    m.tri([Math.cos(a0)*lr,ly,Math.sin(a0)*lr],[Math.cos(a1)*lr,ly,Math.sin(a1)*lr],[0,apex,0],
+      [Math.cos((a0+a1)/2)*0.4,0.85,Math.sin((a0+a1)/2)*0.4],shade(cA,1.14),shade(cB,1.14));}
+};
+const palmGeo=(m,S)=>{
+  const TH=8.2;
+  trunkOf(m,S,0.33,TH,0.56,PAL.palmTrunk,mixc(PAL.palmTrunk,PAL.earth[1],0.20));
+  const F=11, cA=PAL.palmL, cB=PAL.palmD;
+  for(let i=0;i<F;i++){
+    const a=i/F*TAU+0.27, ca=Math.cos(a), sa=Math.sin(a);
+    const px=-sa, pz=ca;
+    const len=5.9+(i%3)*0.75;
+    const seg=[[0.40,TH+0.30,0.26],[len*0.30,TH+1.20,0.60],[len*0.60,TH+0.90,0.54],
+               [len*0.85,TH-0.30,0.33],[len   ,TH-1.85,0.09]];
+    for(let k=0;k<seg.length-1;k++){
+      const [d0,y0,w0]=seg[k], [d1,y1,w1]=seg[k+1];
+      S(Math.min(1,d0/(len*0.75)));
+      const sh2=0.78+0.34*(k/(seg.length-1));
+      const cL=shade(cA,sh2), cD=shade(cB,sh2);
+      const R0=[ca*d0,y0,sa*d0],                       R1=[ca*d1,y1,sa*d1];
+      const drop0=y0-w0*0.55,                          drop1=y1-w1*0.55;
+      const L0=[ca*d0+px*w0,drop0,sa*d0+pz*w0],        L1=[ca*d1+px*w1,drop1,sa*d1+pz*w1];
+      const Q0=[ca*d0-px*w0,drop0,sa*d0-pz*w0],        Q1=[ca*d1-px*w1,drop1,sa*d1-pz*w1];
+      m.quad(R0,R1,L1,L0,cL,cD);
+      m.quad(Q0,Q1,R1,R0,shade(cL,0.9),shade(cD,0.9));
+    }
+  }
+};
+const planGeo=(m,S)=>{
+  const TH=2.1;
+  trunkOf(m,S,0.22,TH,0.80,mixc(PAL.planL,PAL.trunk,0.4),mixc(PAL.planD,PAL.trunk,0.35));
+  const F=7, cA=PAL.planL, cB=PAL.planD;
+  for(let i=0;i<F;i++){
+    const a=i/F*TAU+0.9, ca=Math.cos(a), sa=Math.sin(a);
+    const segs=[[0.3,TH+0.3,0.30],[1.5,TH+1.35,0.78],[2.9,TH+1.15,0.72],[3.9,TH+0.10,0.30]];
+    for(let s=0;s<segs.length-1;s++){
+      const [d0,y0,w0]=segs[s],[d1,y1,w1]=segs[s+1];
+      S(Math.min(1,d0/3.0));
+      const sh2=0.88+0.20*(s/segs.length);
+      m.quad([ca*d0-sa*w0,y0,sa*d0+ca*w0],[ca*d1-sa*w1,y1,sa*d1+ca*w1],
+             [ca*d1+sa*w1,y1,sa*d1-ca*w1],[ca*d0+sa*w0,y0,sa*d0-ca*w0],
+             shade(cA,sh2),shade(cB,sh2));
+    }
+  }
+};
+const gBroad=speciesVAO(broadGeo,trees.broad,0.66,0.35);
+const gPalm =speciesVAO(palmGeo, trees.palm, 0.90,0.55);
+const gPlan =speciesVAO(planGeo, trees.plantain,0.42,1.30);
+
+// ---- people --------------------------------------------------------------
+const personP=prog(`#version 300 es
+in vec3 aPos;in vec3 aNormal;in vec3 aSkin;in float aCloth;in float aSwing;in float aPivot;
+in vec3 iA;in vec3 iB;in vec3 iCloth;in float iPh;in float iSp;in float iType;in float iScale;
+uniform mat4 uVP;uniform float uTime,uPScale;
+out vec3 vN;out vec3 vW;out vec3 vC;
+void main(){
+  float T=iPh+uTime*iSp;
+  float ph=fract(T*0.5);
+  float f=abs(ph*2.0-1.0);                       // ping-pong along the route
+  float sgn=ph<0.5?1.0:-1.0;
+  vec3 pos=mix(iA,iB,f);
+
+  vec2 d=iB.xz-iA.xz;
+  float dl=length(d);
+  vec2 fw = dl>0.001 ? (d/dl)*sgn : vec2(0.0,1.0);
+
+  float farmer =step(0.5,iType)*step(iType,1.5);
+  float carrier=step(1.5,iType)*step(iType,2.5);
+  float sc=iScale*uPScale;
+  vec3 p=aPos*sc;
+
+  float stride=mix(5.4,2.4,farmer);
+  float amp=mix(0.58,0.26,carrier)*(1.0-farmer*0.60);
+  float a=sin(uTime*stride+iPh*6.0)*aSwing*amp;
+  float pv=aPivot*sc, dy=p.y-pv;
+  p.y=pv+dy*cos(a); p.z+=-dy*sin(a);
+  p.y+=abs(sin(uTime*stride+iPh*6.0))*0.04*sc*(1.0-farmer);
+
+  if(farmer>0.5){                                 // bent over the row, hoeing
+    float b=0.80+0.30*sin(uTime*1.9+iPh*5.0);
+    float hip=0.86*sc, e=p.y-hip;
+    if(e>0.0){ p.z+=e*sin(b); p.y=hip+e*cos(b); }
+  }
+
+  vW=pos+vec3(p.x*fw.y+p.z*fw.x, p.y, -p.x*fw.x+p.z*fw.y);
+  vN=vec3(aNormal.x*fw.y+aNormal.z*fw.x, aNormal.y, -aNormal.x*fw.x+aNormal.z*fw.y);
+  vC=mix(aSkin,iCloth,aCloth);
+  gl_Position=uVP*vec4(vW,1.0);
+}`,
+`#version 300 es
+precision highp float;
+in vec3 vN;in vec3 vW;in vec3 vC;uniform vec3 uCam;uniform float uSeason;out vec4 o;
+${COMMON}
+void main(){ o=vec4(grade(applyFog(lightIt(vC,vN,vW,uCam,uSeason),vW,uCam,uSeason),uSeason),1.0); }`);
+
+const gPeople=(function(){
+  const P=[],N=[],SK=[],CL=[],SW=[],PV=[];
+  const SKIN=hx('#6b4630'), HAIR=hx('#2a1d16');
+  function box(cx,cy,cz,sx,sy,sz,col,cloth,swing,pivot){
+    const X=[cx-sx/2,cx+sx/2],Y=[cy-sy/2,cy+sy/2],Z=[cz-sz/2,cz+sz/2];
+    const V=[[0,0,0],[1,0,0],[1,1,0],[0,1,0],[0,0,1],[1,0,1],[1,1,1],[0,1,1]]
+      .map(v=>[X[v[0]],Y[v[1]],Z[v[2]]]);
+    const F=[[0,1,2,3,0,0,-1],[5,4,7,6,0,0,1],[4,0,3,7,-1,0,0],[1,5,6,2,1,0,0],
+             [3,2,6,7,0,1,0],[4,5,1,0,0,-1,0]];
+    for(const f of F){
+      const n=[f[4],f[5],f[6]];
+      for(const t of [[0,1,2],[0,2,3]]) for(const k of t){
+        const v=V[f[k]];
+        P.push(v[0],v[1],v[2]); N.push(n[0],n[1],n[2]);
+        SK.push(col[0],col[1],col[2]); CL.push(cloth); SW.push(swing); PV.push(pivot);
+      }
+    }
+  }
+  box(0,1.14,0, 0.36,0.56,0.21, SKIN,1, 0,    0.86);   // torso  (cloth)
+  box(0,1.58,0, 0.20,0.23,0.21, SKIN,0, 0,    0.86);   // head
+  box(0,1.68,-0.01,0.21,0.10,0.22,HAIR,0,0,   0.86);   // hair
+  box(-0.10,0.43,0, 0.14,0.86,0.15, SKIN,1,  1, 0.86); // left leg
+  box( 0.10,0.43,0, 0.14,0.86,0.15, SKIN,1, -1, 0.86); // right leg
+  box(-0.24,1.12,0, 0.10,0.52,0.11, SKIN,0, -1, 1.38); // left arm
+  box( 0.24,1.12,0, 0.10,0.52,0.11, SKIN,0,  1, 1.38); // right arm
+
+  const vao=gl.createVertexArray();gl.bindVertexArray(vao);
+  buf(new Float32Array(P),3,gl.getAttribLocation(personP,'aPos'));
+  buf(new Float32Array(N),3,gl.getAttribLocation(personP,'aNormal'));
+  buf(new Float32Array(SK),3,gl.getAttribLocation(personP,'aSkin'));
+  buf(new Float32Array(CL),1,gl.getAttribLocation(personP,'aCloth'));
+  buf(new Float32Array(SW),1,gl.getAttribLocation(personP,'aSwing'));
+  buf(new Float32Array(PV),1,gl.getAttribLocation(personP,'aPivot'));
+  const M=PEOPLE.length;
+  const iA=new Float32Array(M*3),iB=new Float32Array(M*3),iC=new Float32Array(M*3),
+        iPh=new Float32Array(M),iSp=new Float32Array(M),iTy=new Float32Array(M),iSc=new Float32Array(M);
+  for(let i=0;i<M;i++){const q=PEOPLE[i];
+    iA[i*3]=q.ax;iA[i*3+1]=q.ay;iA[i*3+2]=q.az;
+    iB[i*3]=q.bx;iB[i*3+1]=q.by;iB[i*3+2]=q.bz;
+    iC[i*3]=q.cloth[0];iC[i*3+1]=q.cloth[1];iC[i*3+2]=q.cloth[2];
+    iPh[i]=q.ph;iSp[i]=q.sp;iTy[i]=q.type;iSc[i]=q.s/1.72;}
+  buf(iA,3,gl.getAttribLocation(personP,'iA'),1);
+  buf(iB,3,gl.getAttribLocation(personP,'iB'),1);
+  buf(iC,3,gl.getAttribLocation(personP,'iCloth'),1);
+  buf(iPh,1,gl.getAttribLocation(personP,'iPh'),1);
+  buf(iSp,1,gl.getAttribLocation(personP,'iSp'),1);
+  buf(iTy,1,gl.getAttribLocation(personP,'iType'),1);
+  buf(iSc,1,gl.getAttribLocation(personP,'iScale'),1);
+  gl.bindVertexArray(null);
+  return {vao,n:P.length/3,inst:M};
+})();
+
+// ---- birds ---------------------------------------------------------------
+const birdP=prog(`#version 300 es
+in vec3 aPos;in float aWing;
+in vec3 iC;in float iR;in float iSp;in float iPh;in float iS;
+uniform mat4 uVP;uniform float uTime;
+out vec3 vW;
+void main(){
+  float a=iPh+uTime*iSp;
+  vec3 c=iC+vec3(cos(a)*iR, sin(a*0.7)*3.5, sin(a)*iR);
+  vec3 p=aPos*iS;
+  p.y+=sin(uTime*7.0+iPh)*aWing*1.35;              // wingbeat
+  float hx=-sin(a)*iSp, hz=cos(a)*iSp;
+  float hl=max(0.0001,length(vec2(hx,hz)));
+  vec2 f=vec2(hx,hz)/hl;
+  vW=c+vec3(p.x*f.y+p.z*f.x, p.y, -p.x*f.x+p.z*f.y);
+  gl_Position=uVP*vec4(vW,1.0);
+}`,
+`#version 300 es
+precision highp float;
+in vec3 vW;uniform vec3 uCam;uniform float uSeason;out vec4 o;
+${COMMON}
+void main(){ o=vec4(grade(applyFog(vec3(0.05,0.06,0.05),vW,uCam,uSeason),uSeason),1.0); }`);
+
+const gBirds=(function(){
+  const P=[],Wg=[];
+  const T=(a,b,c,wa,wb,wc)=>{P.push(...a,...b,...c);Wg.push(wa,wb,wc);};
+  T([0,0,0.35],[-1.7,0.55,-0.35],[-0.22,0,-0.45], 0,1,0.10);   // left wing
+  T([0,0,0.35],[0.22,0,-0.45],[1.7,0.55,-0.35],   0,0.10,1);   // right wing
+  const vao=gl.createVertexArray();gl.bindVertexArray(vao);
+  buf(new Float32Array(P),3,gl.getAttribLocation(birdP,'aPos'));
+  buf(new Float32Array(Wg),1,gl.getAttribLocation(birdP,'aWing'));
+  const N=90, iC=new Float32Array(N*3),iR=new Float32Array(N),iSp=new Float32Array(N),
+        iPh=new Float32Array(N),iS=new Float32Array(N);
+  for(let i=0;i<N;i++){
+    iC[i*3]=R(-360,360); iC[i*3+1]=R(26,105); iC[i*3+2]=R(-360,360);
+    iR[i]=R(16,74); iSp[i]=R(0.10,0.30)*(rnd()<0.5?-1:1); iPh[i]=R(0,6.28); iS[i]=R(0.9,2.0);
+  }
+  buf(iC,3,gl.getAttribLocation(birdP,'iC'),1);
+  buf(iR,1,gl.getAttribLocation(birdP,'iR'),1);
+  buf(iSp,1,gl.getAttribLocation(birdP,'iSp'),1);
+  buf(iPh,1,gl.getAttribLocation(birdP,'iPh'),1);
+  buf(iS,1,gl.getAttribLocation(birdP,'iS'),1);
+  gl.bindVertexArray(null);
+  return {vao,n:P.length/3,inst:N};
+})();
+
+// ---- rain ----------------------------------------------------------------
+const RAIN_MAX=16000;
+const rainP=prog(`#version 300 es
+in vec2 aPos;
+in vec3 iSeed;
+uniform mat4 uVP;uniform vec3 uCam,uRainOrigin;
+uniform float uTime,uRain,uRainB,uRainScale;
+out float vAlong;out float vFade;
+void main(){
+  float H=180.0;
+  float sp=32.0+fract(iSeed.x*7.31+iSeed.z*3.17)*30.0;
+  float y=mod(iSeed.y*H - uTime*sp, H);
+  vec3 base=uRainOrigin+vec3((iSeed.x*2.0-1.0)*uRainB, y, (iSeed.z*2.0-1.0)*uRainB);
+  vec3 dir=normalize(vec3(0.17,-1.0,0.11));
+  vec3 toCam=uCam-base;
+  float dist=length(toCam);
+  vec3 right=normalize(cross(dir, toCam/max(dist,0.001)));
+  float len=(4.5+uRain*8.0)*uRainScale;
+  float wid=0.17*uRainScale;
+  vec3 p=base + right*(aPos.x*wid) - dir*(aPos.y*len);
+  vAlong=aPos.y;
+  vFade=smoothstep(1800.0,260.0,dist)*smoothstep(2.0,14.0,dist);
+  gl_Position=uVP*vec4(p,1.0);
+}`,
+`#version 300 es
+precision highp float;
+in float vAlong;in float vFade;uniform float uRain;out vec4 o;
+void main(){
+  float taper=smoothstep(1.0,0.45,vAlong)*smoothstep(0.0,0.12,vAlong);
+  float a=vFade*taper*(0.16+uRain*0.30);
+  if(a<0.004) discard;
+  o=vec4(vec3(0.80,0.86,0.92), a);
+}`);
+
+const gRain=(function(){
+  const vao=gl.createVertexArray();gl.bindVertexArray(vao);
+  const q=[-0.5,0, 0.5,0, 0.5,1, -0.5,0, 0.5,1, -0.5,1];
+  buf(new Float32Array(q),2,gl.getAttribLocation(rainP,'aPos'));
+  const sd=new Float32Array(RAIN_MAX*3);
+  for(let i=0;i<RAIN_MAX;i++){sd[i*3]=rnd();sd[i*3+1]=rnd();sd[i*3+2]=rnd();}
+  buf(sd,3,gl.getAttribLocation(rainP,'iSeed'),1);
+  gl.bindVertexArray(null);
+  return {vao,n:6,inst:RAIN_MAX};
+})();
+
+const skyVAO=gl.createVertexArray();
+
+/* ==========================================================================
+   9.  Camera
+   ========================================================================== */
+let theta=0.08,phi=0.86,dist=920,target=[40,6,80],goal=null;
+const MAXPHI=Math.PI/2-0.035;
+let drag=0,lx=0,ly=0;
+cv.addEventListener('contextmenu',e=>e.preventDefault());
+cv.addEventListener('pointerdown',e=>{drag=(e.button===2||e.shiftKey)?2:1;lx=e.clientX;ly=e.clientY;
+  goal=null;cv.setPointerCapture(e.pointerId);});
+cv.addEventListener('pointerup',e=>{drag=0;try{cv.releasePointerCapture(e.pointerId);}catch(_){}} );
+cv.addEventListener('pointermove',e=>{
+  if(!drag)return; const dx=e.clientX-lx,dy=e.clientY-ly;lx=e.clientX;ly=e.clientY;
+  if(drag===1){theta-=dx*0.0045;phi=Math.max(0.08,Math.min(MAXPHI,phi-dy*0.004));}
+  else{const k=dist*0.0016,sx=Math.cos(theta),sz=-Math.sin(theta);
+    target[0]-=(dx*sx+dy*sz)*k;target[2]-=(dx*(-sz)+dy*sx)*k;}
+},{passive:true});
+cv.addEventListener('wheel',e=>{e.preventDefault();goal=null;
+  dist=Math.max(30,Math.min(1700,dist*Math.exp(e.deltaY*0.0012)));},{passive:false});
+let pinch=0;
+cv.addEventListener('touchstart',e=>{if(e.touches.length===2)pinch=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);},{passive:true});
+cv.addEventListener('touchmove',e=>{if(e.touches.length===2&&pinch){
+  const d=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);
+  dist=Math.max(30,Math.min(1700,dist*(pinch/d)));pinch=d;}},{passive:true});
+cv.addEventListener('touchend',()=>{pinch=0;},{passive:true});
+
+/* ==========================================================================
+   10.  District markers
+   ========================================================================== */
+const ICON={
+ sprout:'M12 22v-8m0 0C12 10 9 7 4 7c0 5 3 7 8 7zm0 0c0-4 3-7 8-7 0 5-3 7-8 7zM12 9c1.7-1 2.6-2.6 2.6-4.6C12.6 5 11.4 6.4 11 8z',
+ drop:'M12 2.6c3.9 4.6 6 7.6 6 10.2A6 6 0 0 1 6 12.8c0-2.6 2.1-5.6 6-10.2z',
+ tree:'M12 2l4.8 6.6h-2.6L18.6 15h-3l3 4.2H5.4l3-4.2h-3l4.4-6.4H7.2L12 2zm-1.1 17.8h2.2V23h-2.2z',
+ bolt:'M13.6 1.5 4 13.6h6.1L9.4 22.5 19.9 9.8h-6.6z',
+ book:'M4 5.2A2.6 2.6 0 0 1 6.6 2.6H11.4v16H6.6A2.6 2.6 0 0 0 4 21.2zM20 5.2a2.6 2.6 0 0 0-2.6-2.6H12.6v16h4.8A2.6 2.6 0 0 1 20 21.2z',
+ plus:'M9.6 2.4h4.8v7.2h7.2v4.8h-7.2v7.2H9.6v-7.2H2.4V9.6h7.2z',
+ chart:'M3.4 13.2h4v8h-4zm6.6-5h4v13h-4zm6.6-5.4h4v18.4h-4z',
+ people:'M9 11.4a3.3 3.3 0 1 0 0-6.6 3.3 3.3 0 0 0 0 6.6zm7.4.2a2.7 2.7 0 1 0 0-5.4 2.7 2.7 0 0 0 0 5.4zM1.8 19.4c0-3.2 3.2-5.2 7.2-5.2s7.2 2 7.2 5.2v1.2H1.8zm16.1-4.7c2.6.6 4.3 2.3 4.3 4.7v1.2h-4.2v-1.2c0-1.6-.5-3-1.4-4.2z',
+ build:'M2.6 21.4V8.2l6.6-3.4v16.6zm8.4 0V2.6l10.4 4.4v14.4zm3-11.2h2.2v2.4h-2.2zm4 0h2.2v2.4h-2.2zm-4 4.4h2.2v2.4h-2.2zm4 0h2.2v2.4h-2.2z'
+};
+const PINS=[
+ {t:'AGRICULTURE',  c:'#3f9e52', i:'sprout', at:D.agri,   h:26},
+ {t:'WATER',        c:'#2f7fd6', i:'drop',   at:[D.water[0],D.water[1]], h:36},
+ {t:'FORESTS',      c:'#1f7a41', i:'tree',   at:D.forest, h:30},
+ {t:'ENERGY',       c:'#e8a020', i:'bolt',   at:[D.energy[0]+40,D.energy[1]-10], h:34},
+ {t:'EDUCATION',    c:'#2f63d6', i:'book',   at:[SCH[0],SCH[1]], h:22},
+ {t:'HEALTH',       c:'#d13b3b', i:'plus',   at:D.health, h:20},
+ {t:'ECONOMY',      c:'#4046b4', i:'chart',  at:[D.market[0]+58,D.market[1]-54], h:18},
+ {t:'PEOPLE',       c:'#8244c8', i:'people', at:D.homes,  h:18},
+ {t:'INFRASTRUCTURE',c:'#e07a1f',i:'build',  at:[BR.x,BR.z], h:16},
+];
+const pinBox=document.getElementById('pins');
+for(const p of PINS){
+  p.y = (p.t==='INFRASTRUCTURE'? BR.y : terrainH(p.at[0],p.at[1])) + p.h;
+  const el2=document.createElement('div');
+  el2.className='pin'; el2.style.setProperty('--c',p.c);
+  el2.innerHTML='<div class="pill"><span class="ico"><svg viewBox="0 0 24 24"><path d="'+
+    ICON[p.i]+'"/></svg></span><span class="txt">'+p.t+'</span></div>'+
+    '<div class="stem"></div><div class="dot"></div>';
+  el2.querySelector('.pill').addEventListener('click',()=>{
+    goal={x:p.at[0],z:p.at[1],d:Math.max(210,Math.min(dist,430))};
+  });
+  pinBox.appendChild(el2); p.el=el2;
+}
+
+/* ==========================================================================
+   11.  UI
+   ========================================================================== */
+document.getElementById('cB').textContent=stats.bld.toLocaleString();
+document.getElementById('cT').textContent=stats.tree.toLocaleString();
+document.getElementById('cF').textContent=stats.field.toLocaleString();
+document.getElementById('cW').textContent=stats.people.toLocaleString();
+const el={season:document.getElementById('season'),label:document.getElementById('seasonlabel'),
+  story:document.getElementById('story'),trees:document.getElementById('tTrees'),
+  water:document.getElementById('tWater'),wind:document.getElementById('tWind'),
+  crops:document.getElementById('tCrops'),birds:document.getElementById('tBirds'),
+  people:document.getElementById('tPeople'),traffic:document.getElementById('tTraffic'),
+  labels:document.getElementById('tLabels'),
+  sun:document.getElementById('sun'),sunLabel:document.getElementById('sunlabel'),
+  rain:document.getElementById('rain'),rainBtn:document.getElementById('rainbtn'),
+  rainBox:document.getElementById('rainbox'),rainLabel:document.getElementById('rainlabel')};
+const STORY=["The harvest has always been enough.",
+ "The rains come a little later this year.",
+ "The river is lower than the elders remember.",
+ "Clouds pass over without breaking.",
+ "The maize is shorter than last season.",
+ "Water is further to fetch each morning.",
+ "The plantain leaves have begun to curl.",
+ "Rocks show in the riverbed where children swam.",
+ "The harvest will not be enough to sell.",
+ "Some families have begun to leave.",
+ "The school courtyard is quieter now.",
+ "Ama stopped going to school."];
+let seasonTarget=0,season=0;
+let sunTarget=0.60,sunI=0.60;
+let rainTarget=0,rain=0;
+function toHex(c){const f=v=>Math.round(Math.max(0,Math.min(1,v))*255).toString(16).padStart(2,'0');
+  return '#'+f(c[0])+f(c[1])+f(c[2]);}
+const LEG=[PAL.forest,PAL.bush,PAL.grass,PAL.crop,PAL.river,PAL.earth];
+function updateLegend(){for(let i=0;i<6;i++)
+  document.getElementById('sw'+i).style.background=toHex(mixc(LEG[i][0],LEG[i][1],season));}
+const RAINW=[[0,'Drizzle'],[25,'Light'],[45,'Steady'],[68,'Heavy'],[88,'Downpour']];
+function syncRain(){
+  const on=el.rainBtn.getAttribute('aria-pressed')==='true';
+  rainTarget = on ? +el.rain.value/100 : 0;
+  el.rainBox.classList.toggle('off',!on);
+  el.rainBtn.textContent = on ? 'Stop rain' : 'Start rain';
+  let w='Drizzle'; for(const [k,v] of RAINW) if(+el.rain.value>=k) w=v;
+  el.rainLabel.textContent=w;
+}
+el.rainBtn.addEventListener('click',()=>{
+  el.rainBtn.setAttribute('aria-pressed', el.rainBtn.getAttribute('aria-pressed')==='true'?'false':'true');
+  syncRain();
+});
+el.rain.addEventListener('input',syncRain);
+el.labels.addEventListener('change',()=>pinBox.classList.toggle('hide',!el.labels.checked));
+
+const SUNW=[[0,'Overcast'],[20,'Soft'],[40,'Hazy'],[60,'Bright'],[80,'Strong'],[93,'Harsh noon']];
+el.sun.addEventListener('input',()=>{
+  sunTarget=+el.sun.value/100;
+  let w='Overcast'; for(const [k,v] of SUNW) if(+el.sun.value>=k) w=v;
+  el.sunLabel.textContent=w;
+});
+el.season.addEventListener('input',()=>{
+  seasonTarget=+el.season.value/100;
+  const s=Math.min(12,Math.floor(seasonTarget*11.999)+1);
+  el.label.textContent=s+' of 12';
+  el.story.textContent=STORY[s-1];
+});
+updateLegend();
+
+/* ==========================================================================
+   12.  Render
+   ========================================================================== */
+const U=(p,names)=>{const o={};for(const n of names)o[n]=gl.getUniformLocation(p,'u'+n[0].toUpperCase()+n.slice(1));return o;};
+const uM=U(mainP,['vP','cam','season','sunI','rain']),
+      uT=U(treeP,['vP','cam','season','time','wind','shrink','droop','sunI','rain']),
+      uW=U(waterP,['vP','cam','season','time','sunI','rain']),
+      uS=U(skyP,['season','tanHalf','aspect','right','up','fwd','sunI','rain','time']),
+      uBd=U(birdP,['vP','cam','season','time','sunI','rain']),
+      uRn=U(rainP,['vP','cam','time','rain','rainB','rainScale','rainOrigin']),
+      uPr=U(propP,['vP','cam','season','sunI','rain','pos','dir','scale','spin']),
+      uPe=U(personP,['vP','cam','season','time','sunI','rain','pScale']);
+gl.enable(gl.DEPTH_TEST); gl.disable(gl.CULL_FACE);
+let W=0,H=0;
+function resize(){const dpr=Math.min(window.devicePixelRatio||1,1.75);
+  const w=Math.round(cv.clientWidth*dpr),h=Math.round(cv.clientHeight*dpr);
+  if(w!==W||h!==H){W=w;H=h;cv.width=w;cv.height=h;}}
+let t0=performance.now(),fr=0,ft=t0,last=t0;const fpsEl=document.getElementById('fps');
+function drawSpecies(g){ if(!g.inst)return;
+  gl.uniform1f(uT.shrink,g.shrink); gl.uniform1f(uT.droop,g.droop);
+  gl.bindVertexArray(g.vao); gl.drawArraysInstanced(gl.TRIANGLES,0,g.n,g.inst); }
+function drawProp(g,x,y,z,dx,dz,scale,spin){
+  gl.uniform3f(uPr.pos,x,y,z); gl.uniform2f(uPr.dir,dx,dz);
+  gl.uniform1f(uPr.scale,scale); gl.uniform1f(uPr.spin,spin||0);
+  gl.bindVertexArray(g.vao); gl.drawArrays(gl.TRIANGLES,0,g.n);
+}
+function frame(now){
+  resize();
+  const t=(now-t0)/1000, dt=Math.min(0.05,(now-last)/1000); last=now;
+  const prev=season;
+  season+=(seasonTarget-season)*0.10;
+  sunI+=(sunTarget-sunI)*0.14;
+  rain+=(rainTarget-rain)*0.045;
+  if(Math.abs(seasonTarget-season)<0.0015)season=seasonTarget;
+  if(Math.abs(season-prev)>0.0004)updateLegend();
+  if(goal){
+    target[0]+=(goal.x-target[0])*0.06; target[2]+=(goal.z-target[2])*0.06;
+    dist+=(goal.d-dist)*0.06;
+    if(Math.hypot(goal.x-target[0],goal.z-target[2])<2 && Math.abs(goal.d-dist)<3) goal=null;
+  }
+  const sp=Math.sin(phi),cp=Math.cos(phi);
+  const eye=[target[0]+dist*sp*Math.sin(theta),target[1]+dist*cp,target[2]+dist*sp*Math.cos(theta)];
+  const FOV=0.85, ASP=W/H||1;
+  const VP=m4mul(m4persp(FOV,ASP,2,7000),m4look(eye,target,[0,1,0]));
+  let fx=target[0]-eye[0], fy=target[1]-eye[1], fz=target[2]-eye[2];
+  const fl=Math.hypot(fx,fy,fz)||1; fx/=fl; fy/=fl; fz/=fl;
+  let rX=-fz, rY=0, rZ=fx;
+  const rl=Math.hypot(rX,rY,rZ)||1; rX/=rl; rY/=rl; rZ/=rl;
+  const uX=rY*fz-rZ*fy, uY=rZ*fx-rX*fz, uZ=rX*fy-rY*fx;
+  gl.viewport(0,0,W,H); gl.clear(gl.DEPTH_BUFFER_BIT);
+
+  gl.disable(gl.DEPTH_TEST); gl.useProgram(skyP);
+  gl.uniform1f(uS.season,season); gl.uniform1f(uS.sunI,sunI); gl.uniform1f(uS.rain,rain);
+  gl.uniform1f(uS.time,t);
+  gl.uniform1f(uS.tanHalf,Math.tan(FOV/2)); gl.uniform1f(uS.aspect,ASP);
+  gl.uniform3f(uS.right,rX,rY,rZ); gl.uniform3f(uS.up,uX,uY,uZ); gl.uniform3f(uS.fwd,fx,fy,fz);
+  gl.bindVertexArray(skyVAO); gl.drawArrays(gl.TRIANGLES,0,3); gl.enable(gl.DEPTH_TEST);
+
+  gl.useProgram(mainP);
+  gl.uniformMatrix4fv(uM.vP,false,VP); gl.uniform3fv(uM.cam,eye);
+  gl.uniform1f(uM.season,season); gl.uniform1f(uM.sunI,sunI); gl.uniform1f(uM.rain,rain);
+  gl.bindVertexArray(gWorld.vao); gl.drawArrays(gl.TRIANGLES,0,gWorld.n);
+  if(el.crops.checked){gl.bindVertexArray(gCrops.vao);gl.drawArrays(gl.TRIANGLES,0,gCrops.n);}
+  gl.bindVertexArray(gBuilt.vao); gl.drawArrays(gl.TRIANGLES,0,gBuilt.n);
+
+  // traffic and rotors
+  gl.useProgram(propP);
+  gl.uniformMatrix4fv(uPr.vP,false,VP); gl.uniform3fv(uPr.cam,eye);
+  gl.uniform1f(uPr.season,season); gl.uniform1f(uPr.sunI,sunI); gl.uniform1f(uPr.rain,rain);
+  const vScale = 1.0 + Math.min(1,Math.max(0,(dist-240)/900))*1.55;
+  if(el.traffic.checked) for(const v of TRAFFIC){
+    v.s += v.sp*v.dir*dt;
+    if(v.s>v.path.L){v.s=v.path.L;v.dir=-1;} else if(v.s<0){v.s=0;v.dir=1;}
+    const p=v.path.at(v.s);
+    const dx=p.dx*v.dir, dz=p.dz*v.dir;
+    drawProp(VMESH[v.k], p.x-p.dz*v.off, p.y, p.z+p.dx*v.off, dx, dz, vScale, 0);
+  }
+  for(const w of TURBINES)
+    drawProp(gBlades, w.x+Math.sin(w.yaw)*3.6*w.s, w.y, w.z+Math.cos(w.yaw)*3.6*w.s,
+             Math.sin(w.yaw), Math.cos(w.yaw), w.s, w.ph + t*w.sp*(el.wind.checked?1:0.12));
+
+  if(el.trees.checked){
+    gl.useProgram(treeP);
+    gl.uniformMatrix4fv(uT.vP,false,VP); gl.uniform3fv(uT.cam,eye);
+    gl.uniform1f(uT.season,season); gl.uniform1f(uT.time,t);
+    gl.uniform1f(uT.wind,el.wind.checked?1:0); gl.uniform1f(uT.sunI,sunI); gl.uniform1f(uT.rain,rain);
+    drawSpecies(gBroad); drawSpecies(gPalm); drawSpecies(gPlan);
+  }
+  if(el.people.checked && gPeople.inst){
+    gl.useProgram(personP);
+    gl.uniformMatrix4fv(uPe.vP,false,VP); gl.uniform3fv(uPe.cam,eye);
+    gl.uniform1f(uPe.season,season); gl.uniform1f(uPe.time,t);
+    gl.uniform1f(uPe.sunI,sunI); gl.uniform1f(uPe.rain,rain);
+    gl.uniform1f(uPe.pScale, 1.0 + Math.min(1,Math.max(0,(dist-240)/900))*0.85);
+    gl.bindVertexArray(gPeople.vao);
+    gl.drawArraysInstanced(gl.TRIANGLES,0,gPeople.n,gPeople.inst);
+  }
+  if(el.birds.checked){
+    gl.useProgram(birdP);
+    gl.uniformMatrix4fv(uBd.vP,false,VP); gl.uniform3fv(uBd.cam,eye);
+    gl.uniform1f(uBd.season,season); gl.uniform1f(uBd.time,t); gl.uniform1f(uBd.sunI,sunI); gl.uniform1f(uBd.rain,rain);
+    gl.bindVertexArray(gBirds.vao);
+    gl.drawArraysInstanced(gl.TRIANGLES,0,gBirds.n,gBirds.inst);
+  }
+  if(el.water.checked){
+    gl.useProgram(waterP);
+    gl.uniformMatrix4fv(uW.vP,false,VP); gl.uniform3fv(uW.cam,eye);
+    gl.uniform1f(uW.season,season); gl.uniform1f(uW.time,t); gl.uniform1f(uW.sunI,sunI); gl.uniform1f(uW.rain,rain);
+    gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA); gl.depthMask(false);
+    gl.bindVertexArray(gWater.vao); gl.drawArrays(gl.TRIANGLES,0,gWater.n);
+    gl.depthMask(true); gl.disable(gl.BLEND);
+  }
+  if(rain>0.004){
+    gl.useProgram(rainP);
+    gl.uniformMatrix4fv(uRn.vP,false,VP); gl.uniform3fv(uRn.cam,eye);
+    gl.uniform1f(uRn.time,t); gl.uniform1f(uRn.rain,rain);
+    const B=Math.max(190,Math.min(640,dist*0.60));
+    gl.uniform1f(uRn.rainB,B);
+    gl.uniform1f(uRn.rainScale,Math.max(1.0,dist/620));
+    gl.uniform3f(uRn.rainOrigin,target[0],-18,target[2]);
+    gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA); gl.depthMask(false);
+    gl.bindVertexArray(gRain.vao);
+    gl.drawArraysInstanced(gl.TRIANGLES,0,gRain.n,Math.floor(RAIN_MAX*rain));
+    gl.depthMask(true); gl.disable(gl.BLEND);
+  }
+
+  // ---- pin the district markers to their ground anchors ------------------
+  if(el.labels.checked){
+    const cw=cv.clientWidth, ch=cv.clientHeight;
+    for(const p of PINS){
+      const x=p.at[0], y=p.y, z=p.at[1];
+      const px=VP[0]*x+VP[4]*y+VP[8]*z+VP[12];
+      const py=VP[1]*x+VP[5]*y+VP[9]*z+VP[13];
+      const pw=VP[3]*x+VP[7]*y+VP[11]*z+VP[15];
+      if(pw<=1){ p.el.style.display='none'; continue; }
+      const sx=(px/pw*0.5+0.5)*cw, sy=(1-(py/pw*0.5+0.5))*ch;
+      if(sx<-260||sx>cw+260||sy<-140||sy>ch+140){ p.el.style.display='none'; continue; }
+      const k=Math.max(0.78,Math.min(1.06,940/pw));
+      p.el.style.display='flex';
+      p.el.style.setProperty('--stem',(32+30*k)+'px');
+      p.el.style.transform='translate('+sx.toFixed(1)+'px,'+sy.toFixed(1)+'px) '+
+                           'translate(-50%,-100%) scale('+k.toFixed(3)+')';
+      p.el.style.opacity=String(Math.max(0.55,Math.min(1,(2200-pw)/700)));
+    }
+  }
+
+  fr++; if(now-ft>500){fpsEl.textContent=Math.round(fr*1000/(now-ft))+' fps';fr=0;ft=now;}
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
