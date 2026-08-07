@@ -2,7 +2,7 @@
 
 Try the MVP here:
 
-🔗 https://earth-engine-mvp.netlify.app
+🔗 https://earth-engine-prototype.netlify.app
 
 > **Note:** For the best experience, use a PC/laptop. The simulation is optimized for larger screens.
 
