@@ -1,6 +1,6 @@
 ## 🚀 Live Demo
 
-Try the MVP here:
+Try the Prototype here:
 
 🔗 https://earth-engine-prototype.netlify.app
 
